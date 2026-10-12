@@ -1,4 +1,5 @@
 // Frontend service connecting to Vite backend SSE serial stream and status API
+import { MLInferenceResult, runTrainedModelInference } from './trainedModelInference';
 
 export interface Esp32Telemetry {
   ntcAdc: number | null;
@@ -9,6 +10,7 @@ export interface Esp32Telemetry {
   currentMa: number | null;
   powerMw: number | null;
   lastUpdated: string;
+  mlDiagnosis?: MLInferenceResult | null;
 }
 
 export interface SerialLineEntry {
@@ -75,6 +77,17 @@ class Esp32Service {
           baudRate: data.baudRate || 115200,
         };
         if (data.telemetry) {
+          if (!data.telemetry.mlDiagnosis && data.telemetry.ds18b20Temp !== null && data.telemetry.ntcTemp !== null && data.telemetry.busVoltage !== null) {
+            data.telemetry.mlDiagnosis = runTrainedModelInference({
+              ds18b20Temp: data.telemetry.ds18b20Temp,
+              ntcTemp: data.telemetry.ntcTemp,
+              ntcAdc: data.telemetry.ntcAdc ?? 1945,
+              busVoltage: data.telemetry.busVoltage,
+              shuntVoltage: data.telemetry.shuntVoltage ?? 0.06,
+              currentMa: data.telemetry.currentMa ?? 0.6,
+              powerMw: data.telemetry.powerMw ?? 2.0,
+            });
+          }
           this.currentTelemetry = data.telemetry;
           this.notifyTelemetry(this.currentTelemetry);
         }
@@ -115,6 +128,17 @@ class Esp32Service {
       es.addEventListener('telemetry', (evt: MessageEvent) => {
         try {
           const data: Esp32Telemetry = JSON.parse(evt.data);
+          if (!data.mlDiagnosis && data.ds18b20Temp !== null && data.ntcTemp !== null && data.busVoltage !== null) {
+            data.mlDiagnosis = runTrainedModelInference({
+              ds18b20Temp: data.ds18b20Temp,
+              ntcTemp: data.ntcTemp,
+              ntcAdc: data.ntcAdc ?? 1945,
+              busVoltage: data.busVoltage,
+              shuntVoltage: data.shuntVoltage ?? 0.06,
+              currentMa: data.currentMa ?? 0.6,
+              powerMw: data.powerMw ?? 2.0,
+            });
+          }
           this.currentTelemetry = data;
           this.notifyTelemetry(data);
         } catch (e) {

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';
 import type { Plugin, ViteDevServer, PreviewServer } from 'vite';
+import { runTrainedModelInference, modelMetadata, type MLInferenceResult } from './src/services/trainedModelInference.ts';
 
 export interface Esp32Telemetry {
   ntcAdc: number | null;
@@ -11,6 +12,7 @@ export interface Esp32Telemetry {
   currentMa: number | null;
   powerMw: number | null;
   lastUpdated: string;
+  mlDiagnosis?: MLInferenceResult | null;
 }
 
 interface SerialState {
@@ -107,6 +109,21 @@ function parseLine(line: string) {
 
   if (updated) {
     state.telemetry.lastUpdated = new Date().toISOString();
+    if (state.telemetry.ds18b20Temp !== null && state.telemetry.ntcTemp !== null && state.telemetry.busVoltage !== null) {
+      try {
+        state.telemetry.mlDiagnosis = runTrainedModelInference({
+          ds18b20Temp: state.telemetry.ds18b20Temp,
+          ntcTemp: state.telemetry.ntcTemp,
+          ntcAdc: state.telemetry.ntcAdc ?? 1945,
+          busVoltage: state.telemetry.busVoltage,
+          shuntVoltage: state.telemetry.shuntVoltage ?? 0.06,
+          currentMa: state.telemetry.currentMa ?? 0.60,
+          powerMw: state.telemetry.powerMw ?? 2.0,
+        });
+      } catch (err) {
+        console.warn('[ESP32] Inference error:', err);
+      }
+    }
     broadcast('telemetry', state.telemetry);
   }
 }
@@ -278,6 +295,42 @@ export function esp32SerialPlugin(): Plugin {
               }
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ error: 'Device not ready or command empty' }));
+            } catch (err: any) {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: err.message }));
+            }
+          });
+          return;
+        }
+
+        // 4. ML Model Metadata API
+        if (req.url === '/api/ml/model') {
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(JSON.stringify(modelMetadata));
+          return;
+        }
+
+        // 5. ML Inference API
+        if (req.url === '/api/ml/infer' && req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => {
+            body += chunk;
+          });
+          req.on('end', () => {
+            try {
+              const input = JSON.parse(body || '{}');
+              const result = runTrainedModelInference({
+                ds18b20Temp: input.ds18b20Temp ?? state.telemetry.ds18b20Temp ?? 25.0,
+                ntcTemp: input.ntcTemp ?? state.telemetry.ntcTemp ?? 22.8,
+                ntcAdc: input.ntcAdc ?? state.telemetry.ntcAdc ?? 1945,
+                busVoltage: input.busVoltage ?? state.telemetry.busVoltage ?? 3.32,
+                shuntVoltage: input.shuntVoltage ?? state.telemetry.shuntVoltage ?? 0.06,
+                currentMa: input.currentMa ?? state.telemetry.currentMa ?? 0.6,
+                powerMw: input.powerMw ?? state.telemetry.powerMw ?? 2.0,
+              });
+              res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+              res.end(JSON.stringify(result));
             } catch (err: any) {
               res.writeHead(500, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ error: err.message }));

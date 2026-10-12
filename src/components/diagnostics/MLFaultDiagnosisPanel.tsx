@@ -71,7 +71,14 @@ export const MLFaultDiagnosisPanel: React.FC<MLFaultDiagnosisPanelProps> = ({
             <div className="flex items-center gap-1.5 px-3 py-1 rounded bg-[#0f172a] border border-cyan-800/60 font-mono text-[11px] text-cyan-300">
               <Cpu className="w-3.5 h-3.5 text-cyan-400" />
               <span>CONFIDENCE: {(diagnosticResult.confidence * 100).toFixed(1)}%</span>
-              <span className="text-amber-400 text-[9px] uppercase font-bold">(SIMULATED)</span>
+              {diagnosticResult.isSimulated ? (
+                <span className="text-amber-400 text-[9px] uppercase font-bold">(SIMULATED)</span>
+              ) : (
+                <span className="text-emerald-400 text-[9px] uppercase font-bold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  TRAINED ENSEMBLE
+                </span>
+              )}
             </div>
           )}
 

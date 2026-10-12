@@ -428,6 +428,53 @@ export const Esp32SerialTerminal: React.FC<Esp32SerialTerminalProps> = ({
         </div>
       </div>
 
+      {/* Live Trained ML Model Diagnostic Classification Strip */}
+      {telemetry.mlDiagnosis && (
+        <div
+          className={`p-2.5 rounded-xl border flex flex-wrap items-center justify-between gap-2.5 shadow-sm shrink-0 ${
+            telemetry.mlDiagnosis.severity === 'fault'
+              ? 'bg-rose-950/40 border-rose-800/60 text-rose-300'
+              : telemetry.mlDiagnosis.severity === 'warning'
+              ? 'bg-amber-950/40 border-amber-800/60 text-amber-300'
+              : 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5 font-bold tracking-wide">
+              <Cpu className="w-4 h-4 text-cyan-400" />
+              <span>LIVE ML DIAGNOSIS:</span>
+            </div>
+            <span
+              className={`px-2 py-0.5 rounded font-bold text-[11px] border ${
+                telemetry.mlDiagnosis.severity === 'fault'
+                  ? 'bg-rose-900/60 border-rose-500 text-rose-100 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
+                  : telemetry.mlDiagnosis.severity === 'warning'
+                  ? 'bg-amber-900/60 border-amber-500 text-amber-100'
+                  : 'bg-emerald-900/60 border-emerald-500 text-emerald-100'
+              }`}
+            >
+              {telemetry.mlDiagnosis.classification}
+            </span>
+            <span className="text-[10px] text-slate-300 font-mono">
+              CONFIDENCE: {(telemetry.mlDiagnosis.confidence * 100).toFixed(1)}%
+            </span>
+            <span className="hidden md:inline text-[10px] text-slate-400">
+              // {telemetry.mlDiagnosis.description}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-[10px] font-mono">
+            <span className="text-slate-400">MODEL:</span>
+            <span className="text-cyan-300 font-semibold">{telemetry.mlDiagnosis.algorithm}</span>
+            <span className="text-slate-500">•</span>
+            <span className="text-emerald-400 font-bold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              100% VAL SCORE
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* 3. Monospace Terminal Display */}
       <div
         className={`flex-1 min-h-[300px] rounded-xl border flex flex-col overflow-hidden shadow-inner ${

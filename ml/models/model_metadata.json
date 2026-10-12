@@ -1,0 +1,188 @@
+{
+  "modelName": "Aerospace Sensor Fault Classifier (Random Forest Ensemble)",
+  "algorithm": "RandomForestClassifier",
+  "nEstimators": 100,
+  "maxDepth": 12,
+  "trainedAt": "2026-10-12T21:54:01Z",
+  "validationAccuracy": 1.0,
+  "classes": [
+    "NOMINAL",
+    "THERMAL_DECAY_LAG",
+    "SENSOR_CROSS_DRIFT",
+    "SUPPLY_VOLTAGE_SAG",
+    "SUPPLY_VOLTAGE_SPIKE",
+    "OVERCURRENT_LATCHUP",
+    "SENSOR_DROPOUT"
+  ],
+  "classDescriptions": {
+    "NOMINAL": "All telemetry channels within nominal calibrated aerospace operating envelope.",
+    "THERMAL_DECAY_LAG": "Elevated thermal dissipation impedance or trapped heat accumulation.",
+    "SENSOR_CROSS_DRIFT": "Thermal channel mismatch between redundant NTC and digital probe.",
+    "SUPPLY_VOLTAGE_SAG": "Under-voltage rail sag (< 3.12V) on 3.3V regulated bus.",
+    "SUPPLY_VOLTAGE_SPIKE": "Over-voltage transient (> 3.48V) threatening CMOS logic margins.",
+    "OVERCURRENT_LATCHUP": "Anomalous current surge (> 15mA) indicative of parasitic latchup.",
+    "SENSOR_DROPOUT": "Sensor channel open circuit, signal disconnect, or ADC boundary latch."
+  },
+  "classSeverity": {
+    "NOMINAL": "healthy",
+    "THERMAL_DECAY_LAG": "fault",
+    "SENSOR_CROSS_DRIFT": "warning",
+    "SUPPLY_VOLTAGE_SAG": "warning",
+    "SUPPLY_VOLTAGE_SPIKE": "fault",
+    "OVERCURRENT_LATCHUP": "fault",
+    "SENSOR_DROPOUT": "fault"
+  },
+  "features": [
+    "ds18b20_temp",
+    "ntc_temp",
+    "ntc_adc",
+    "temp_delta",
+    "bus_voltage",
+    "voltage_dev",
+    "shunt_voltage",
+    "current_ma",
+    "power_mw"
+  ],
+  "featureImportances": {
+    "ds18b20_temp": 0.09723623646077005,
+    "ntc_temp": 0.07118470271949395,
+    "ntc_adc": 0.12051415355458595,
+    "temp_delta": 0.25216897787581305,
+    "bus_voltage": 0.17790611405551948,
+    "voltage_dev": 0.08652621045784098,
+    "shunt_voltage": 0.05474311506426886,
+    "current_ma": 0.07021229368948126,
+    "power_mw": 0.06950819612222642
+  },
+  "confusionMatrix": [
+    [
+      120,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      120,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      120,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      120,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      120,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      120,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      120
+    ]
+  ],
+  "classificationReport": {
+    "NOMINAL": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 120.0
+    },
+    "THERMAL_DECAY_LAG": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 120.0
+    },
+    "SENSOR_CROSS_DRIFT": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 120.0
+    },
+    "SUPPLY_VOLTAGE_SAG": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 120.0
+    },
+    "SUPPLY_VOLTAGE_SPIKE": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 120.0
+    },
+    "OVERCURRENT_LATCHUP": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 120.0
+    },
+    "SENSOR_DROPOUT": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 120.0
+    },
+    "accuracy": 1.0,
+    "macro avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 840.0
+    },
+    "weighted avg": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 840.0
+    }
+  },
+  "hardwareBaseline": {
+    "ntc_adc": 1919.0,
+    "ntc_temp": 22.2,
+    "ds18b20_temp": 25.19,
+    "bus_voltage": 3.324,
+    "shunt_voltage": 0.05,
+    "current_ma": 0.5,
+    "power_mw": 4.0
+  }
+}

@@ -125,9 +125,9 @@ export const MissionContextPanel: React.FC = () => {
         {/* ML Inference Status */}
         <div className="flex items-center justify-between">
           <span className="text-slate-400 text-[10px]">ML INFERENCE:</span>
-          <span className="text-cyan-400 font-medium flex items-center gap-1 text-[10px]">
-            <Cpu className="w-3 h-3 text-cyan-400" />
-            READY (ONNX INT8)
+          <span className="text-emerald-400 font-bold flex items-center gap-1 text-[10px]">
+            <Cpu className="w-3 h-3 text-emerald-400 animate-pulse" />
+            ACTIVE (RANDOM FOREST)
           </span>
         </div>
       </div>
