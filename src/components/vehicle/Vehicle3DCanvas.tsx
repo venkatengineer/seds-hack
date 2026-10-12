@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { BoardItem, SubsystemItem, PhysicalAssemblyItem } from '../../types/vehicle';
 
 export type VehicleInspectionMode = 'exterior' | 'cross-section' | 'cutaway' | 'exploded';
+export type CameraStagePreset = 'all' | 'nose' | 'avionics' | 'propulsion';
 
 interface Vehicle3DCanvasProps {
   boards: BoardItem[];
@@ -22,6 +23,7 @@ interface Vehicle3DCanvasProps {
   onRegisterFitCamera?: (fitFn: () => void) => void;
   onRegisterResetCamera?: (resetFn: () => void) => void;
   onRegisterFocusBoard?: (focusFn: (boardId: string) => void) => void;
+  onRegisterSetCameraPreset?: (presetFn: (preset: CameraStagePreset) => void) => void;
   onProjectedAnchor?: (anchor: { x: number; y: number; visible: boolean; boardId: string } | null) => void;
 }
 
@@ -42,6 +44,7 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
   onRegisterFitCamera,
   onRegisterResetCamera,
   onRegisterFocusBoard,
+  onRegisterSetCameraPreset,
   onProjectedAnchor,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -1054,6 +1057,40 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
           isAnimating: true,
           startTime: performance.now(),
           duration: 750,
+          startPos: cameraRef.current.position.clone(),
+          targetPos,
+          startLookAt: controlsRef.current.target.clone(),
+          targetLookAt,
+        };
+      });
+    }
+
+    if (onRegisterSetCameraPreset) {
+      onRegisterSetCameraPreset((preset: CameraStagePreset) => {
+        if (!cameraRef.current || !controlsRef.current || !vehicleRootRef.current) return;
+
+        let targetLookAt = new THREE.Vector3(0, 0, 0);
+        let targetPos = new THREE.Vector3(0, 0, 16);
+
+        if (preset === 'all') {
+          const fitted = computeFittedCameraState(cameraRef.current, vehicleRootRef.current, inspectionModeRef.current);
+          targetLookAt = fitted.target;
+          targetPos = fitted.position;
+        } else if (preset === 'nose') {
+          targetLookAt = new THREE.Vector3(0, 4.4, 0.05);
+          targetPos = new THREE.Vector3(1.5, 4.7, 3.2);
+        } else if (preset === 'avionics') {
+          targetLookAt = new THREE.Vector3(0, 2.05, 0.12);
+          targetPos = new THREE.Vector3(1.4, 2.3, 3.1);
+        } else if (preset === 'propulsion') {
+          targetLookAt = new THREE.Vector3(0, -3.9, 0.05);
+          targetPos = new THREE.Vector3(1.7, -3.6, 3.4);
+        }
+
+        cameraAnimRef.current = {
+          isAnimating: true,
+          startTime: performance.now(),
+          duration: 850,
           startPos: cameraRef.current.position.clone(),
           targetPos,
           startLookAt: controlsRef.current.target.clone(),

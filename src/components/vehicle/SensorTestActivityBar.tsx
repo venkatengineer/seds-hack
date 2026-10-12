@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSystem } from '../../context/SystemContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Activity, Square, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Activity, Square, CheckCircle2, AlertTriangle, Zap, Play } from 'lucide-react';
 
 export const SensorTestActivityBar: React.FC = () => {
   const {
@@ -9,13 +9,44 @@ export const SensorTestActivityBar: React.FC = () => {
     pulsePhase,
     testProgress,
     elapsedTestTimeSeconds,
+    startLiveTest,
     stopLiveTest,
     selectedBoardId,
     testRuns,
   } = useSystem();
   const { isDark } = useTheme();
 
-  if (!isTesting) return null;
+  if (!isTesting) {
+    return (
+      <div className="absolute top-5 left-1/2 -translate-x-1/2 z-30 pointer-events-auto font-mono select-none">
+        <button
+          onClick={() => startLiveTest()}
+          title="Trigger Active Thermal Stimulus Pulse & Run ML INT8 Fault Inference"
+          className={`flex items-center gap-2.5 px-4 py-2 rounded-full border shadow-2xl backdrop-blur-2xl text-xs font-semibold cursor-pointer transition-all duration-200 hover:scale-105 group ${
+            isDark
+              ? 'bg-slate-950/85 hover:bg-cyan-950/90 border-cyan-700/60 hover:border-cyan-400 text-cyan-300 shadow-[0_0_24px_rgba(6,182,212,0.3)]'
+              : 'bg-white/95 hover:bg-cyan-50 border-cyan-400 hover:border-cyan-600 text-cyan-800 shadow-[0_8px_24px_rgba(6,182,212,0.2)]'
+          }`}
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+          </span>
+          <Zap className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+          <span className="tracking-wider">RUN FAULT STIMULUS TEST</span>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full border font-bold ${
+              isDark
+                ? 'bg-cyan-950/80 border-cyan-800/60 text-cyan-400'
+                : 'bg-cyan-100 border-cyan-300 text-cyan-900'
+            }`}
+          >
+            INT8 ML
+          </span>
+        </button>
+      </div>
+    );
+  }
 
   const currentRunId = testRuns.length > 0 ? `RUN ${(testRuns.length + 1).toString().padStart(4, '0')}` : 'RUN 0042';
 

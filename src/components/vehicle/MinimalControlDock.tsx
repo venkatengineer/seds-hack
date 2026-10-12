@@ -24,6 +24,7 @@ interface MinimalControlDockProps {
   setShowGrid?: React.Dispatch<React.SetStateAction<boolean>>;
   onFitVehicle: () => void;
   onResetCamera: () => void;
+  onSetStagePreset?: (preset: 'all' | 'nose' | 'avionics' | 'propulsion') => void;
 }
 
 export const MinimalControlDock: React.FC<MinimalControlDockProps> = ({
@@ -37,8 +38,10 @@ export const MinimalControlDock: React.FC<MinimalControlDockProps> = ({
   setShowGrid,
   onFitVehicle,
   onResetCamera,
+  onSetStagePreset,
 }) => {
   const { theme, toggleTheme, isDark } = useTheme();
+  const [activeStage, setActiveStage] = useState<'all' | 'nose' | 'avionics' | 'propulsion'>('all');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
@@ -114,6 +117,42 @@ export const MinimalControlDock: React.FC<MinimalControlDockProps> = ({
                     ? 'bg-cyan-900/60 text-cyan-200 border border-cyan-600/70 font-semibold shadow-inner'
                     : 'bg-cyan-100 text-cyan-900 border border-cyan-300 font-semibold shadow-sm'
                   : 'text-slate-400 hover:text-slate-100'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Divider */}
+      {activeTabMode === '3d' && onSetStagePreset && (
+        <div className={`h-4 w-px hidden md:block ${isDark ? 'bg-slate-700/50' : 'bg-slate-300'}`} />
+      )}
+
+      {/* STAGE FOCUS (ALL / NOSE / AVIONICS / PROPULSION) */}
+      {activeTabMode === '3d' && onSetStagePreset && (
+        <div className="hidden md:flex items-center gap-0.5 text-[10px]">
+          <span className="text-slate-500 text-[9px] px-1 font-bold">FOCUS:</span>
+          {([
+            { id: 'all', label: 'All' },
+            { id: 'nose', label: 'Nose' },
+            { id: 'avionics', label: 'Avionics' },
+            { id: 'propulsion', label: 'Engine' },
+          ] as const).map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => {
+                setActiveStage(id);
+                onSetStagePreset(id);
+              }}
+              title={`Stage Focus: ${label}`}
+              className={`px-2 py-0.5 rounded-full transition-all cursor-pointer ${
+                activeStage === id
+                  ? isDark
+                    ? 'bg-slate-800 text-cyan-300 font-bold border border-slate-700 shadow-sm'
+                    : 'bg-slate-200 text-cyan-800 font-bold'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               {label}

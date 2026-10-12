@@ -35,14 +35,14 @@ export const QuickBoardLocator: React.FC<QuickBoardLocatorProps> = ({
   const warningCount = boards.filter(b => b.status === 'warning').length;
 
   return (
-    <div className="absolute top-6 left-6 z-30 pointer-events-auto font-mono select-none">
+    <div className="absolute top-5 left-[175px] z-30 pointer-events-auto font-mono select-none">
       {/* Collapsed Pill Button */}
       <button
         onClick={() => setIsOpen(open => !open)}
-        className={`flex items-center gap-2.5 px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-xl border transition-all cursor-pointer shadow-lg ${
+        className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold backdrop-blur-xl border transition-all cursor-pointer shadow-xl ${
           isDark
-            ? 'bg-[#0a0f18]/90 border-slate-700/80 text-slate-200 hover:border-cyan-500/70 hover:bg-[#0f172a]'
-            : 'bg-white/90 border-slate-200 text-slate-800 hover:border-cyan-500/50 hover:bg-slate-50'
+            ? 'bg-slate-950/75 border-slate-800 text-slate-200 hover:border-cyan-700/60 shadow-black/40 hover:bg-slate-900/90'
+            : 'bg-white/85 border-slate-300 text-slate-800 hover:border-cyan-600 shadow-slate-300/40 hover:bg-white'
         }`}
         title="Toggle Quick Avionics Bay Locator"
       >

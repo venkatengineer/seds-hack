@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSystem } from '../../context/SystemContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Radio, Cpu, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Radio, Cpu, ChevronDown, ChevronUp } from 'lucide-react';
 
 export const MissionContextPanel: React.FC = () => {
   const { vehicle, isTesting, testRuns } = useSystem();
   const { isDark } = useTheme();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Determine current test state from actual execution lifecycle
   const testStateLabel = isTesting
@@ -24,16 +25,45 @@ export const MissionContextPanel: React.FC = () => {
 
   return (
     <div
-      className={`absolute top-[72px] left-5 z-20 pointer-events-auto rounded-xl p-3 backdrop-blur-xl border font-mono select-none transition-all duration-200 shadow-xl w-60 sm:w-64 ${
+      className={`absolute top-[72px] left-5 z-20 pointer-events-auto rounded-xl p-3 backdrop-blur-xl border font-mono select-none transition-all duration-200 shadow-xl ${
+        isCollapsed ? 'w-56' : 'w-60 sm:w-64'
+      } ${
         isDark
           ? 'bg-slate-950/75 border-slate-800/80 text-slate-300 shadow-black/40'
           : 'bg-white/85 border-slate-300 text-slate-700 shadow-slate-300/40'
       }`}
     >
-      <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-700/40 text-[9px] uppercase tracking-wider text-slate-400">
-        <span>MISSION CONTEXT</span>
-        <span className="text-cyan-500 font-bold">TELEMETRY SYNC</span>
+      <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-700/40 text-[9px] uppercase tracking-wider text-slate-400">
+        <span className="flex items-center gap-1.5 font-bold text-slate-300">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+          MISSION CONTEXT
+        </span>
+        <button
+          onClick={() => setIsCollapsed(c => !c)}
+          title={isCollapsed ? 'Expand Mission Context' : 'Collapse Panel'}
+          className="p-0.5 rounded hover:bg-slate-800/50 text-slate-400 hover:text-slate-200 cursor-pointer transition-colors"
+        >
+          {isCollapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+        </button>
       </div>
+
+      {isCollapsed ? (
+        <div className="flex items-center justify-between text-[11px] pt-0.5">
+          <span className="text-slate-400 text-[10px]">{vehicle.id}</span>
+          <span className={`font-semibold flex items-center gap-1.5 ${testStateColor}`}>
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isTesting
+                  ? 'bg-cyan-400 animate-ping'
+                  : testRuns.length > 0 && testRuns[0].outcome === 'fault_confirmed'
+                  ? 'bg-rose-400'
+                  : 'bg-emerald-400'
+              }`}
+            />
+            {testStateLabel}
+          </span>
+        </div>
+      ) : (
 
       <div className="space-y-1.5 text-[11px]">
         {/* Vehicle Identifier */}
@@ -80,6 +110,7 @@ export const MissionContextPanel: React.FC = () => {
           </span>
         </div>
       </div>
+      )}
     </div>
   );
 };

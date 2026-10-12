@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useSystem } from '../../context/SystemContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Vehicle3DCanvas, VehicleInspectionMode } from './Vehicle3DCanvas';
+import { Vehicle3DCanvas, VehicleInspectionMode, CameraStagePreset } from './Vehicle3DCanvas';
 import { Vehicle2DBlueprint } from './Vehicle2DBlueprint';
 import { CompactBayInspector } from './CompactBayInspector';
 import { MinimalControlDock } from './MinimalControlDock';
@@ -10,6 +10,7 @@ import { SpatialHoverTooltip } from './SpatialHoverTooltip';
 import { MissionContextPanel } from './MissionContextPanel';
 import { SensorTestActivityBar } from './SensorTestActivityBar';
 import { ProjectedVehicleAnnotation } from './ProjectedVehicleAnnotation';
+import { LiveTelemetryHUDWidget } from './LiveTelemetryHUDWidget';
 
 export const VehicleVisualization: React.FC = () => {
   const {
@@ -33,6 +34,7 @@ export const VehicleVisualization: React.FC = () => {
   const [fitCameraFn, setFitCameraFn] = useState<(() => void) | null>(null);
   const [resetCameraFn, setResetCameraFn] = useState<(() => void) | null>(null);
   const [focusBoardFn, setFocusBoardFn] = useState<((boardId: string) => void) | null>(null);
+  const [stagePresetFn, setStagePresetFn] = useState<((preset: CameraStagePreset) => void) | null>(null);
 
   // Projected 3D-to-screen anchor position for selected board engineering callout
   const [projectedAnchor, setProjectedAnchor] = useState<{
@@ -73,6 +75,7 @@ export const VehicleVisualization: React.FC = () => {
             onRegisterFitCamera={fn => setFitCameraFn(() => fn)}
             onRegisterResetCamera={fn => setResetCameraFn(() => fn)}
             onRegisterFocusBoard={fn => setFocusBoardFn(() => fn)}
+            onRegisterSetCameraPreset={fn => setStagePresetFn(() => fn)}
             onProjectedAnchor={setProjectedAnchor}
           />
         ) : (
@@ -152,7 +155,10 @@ export const VehicleVisualization: React.FC = () => {
           />
         )}
 
-        {/* 7. Bottom Floating Minimal Control Dock with Three Logical Groups */}
+        {/* 7. Real-Time Telemetry HUD Stream Widget */}
+        <LiveTelemetryHUDWidget />
+
+        {/* 8. Bottom Floating Minimal Control Dock with Stage Focus and Appearance Groups */}
         <MinimalControlDock
           activeTabMode={activeTabMode}
           setActiveTabMode={setActiveTabMode}
@@ -168,9 +174,12 @@ export const VehicleVisualization: React.FC = () => {
           onResetCamera={() => {
             if (resetCameraFn) resetCameraFn();
           }}
+          onSetStagePreset={preset => {
+            if (stagePresetFn) stagePresetFn(preset);
+          }}
         />
 
-        {/* 8. Subtle Spatial Interaction Hint in Bottom-Left */}
+        {/* 9. Subtle Spatial Interaction Hint in Bottom-Left */}
         <div
           className={`absolute bottom-6 left-6 hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full font-mono text-[10px] pointer-events-none backdrop-blur-md border ${
             isDark
@@ -180,6 +189,18 @@ export const VehicleVisualization: React.FC = () => {
         >
           <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
           <span>DRAG TO ORBIT • SCROLL TO ZOOM • SELECT AVIONICS BAY</span>
+        </div>
+
+        {/* 10. Corner Aerospace Mission Control Telemetry Watermarks */}
+        <div className="absolute top-20 right-6 hidden xl:block font-mono text-[9px] text-slate-500/60 pointer-events-none text-right space-y-0.5 select-none">
+          <div>KSC LC-39A // DOWNLINK: SPACEWIRE 100Hz</div>
+          <div>TELEMETRY CYCLE: 10ms // SYNC: LOCKED</div>
+          <div>ML INFERENCE: ONNX INT8 // ENGINE: READY</div>
+        </div>
+
+        <div className="absolute bottom-16 left-6 hidden xl:block font-mono text-[9px] text-slate-500/50 pointer-events-none space-y-0.5 select-none">
+          <div>CAD DATUM: STA 0.00m // WGS-84 LAT 28.5721° N</div>
+          <div>VEHICLE: ORION-IX BLK 2 // COORD: FRAME-B</div>
         </div>
       </div>
     </div>
