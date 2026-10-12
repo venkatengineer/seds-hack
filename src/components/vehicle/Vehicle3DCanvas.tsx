@@ -17,9 +17,11 @@ interface Vehicle3DCanvasProps {
   setHoveredBoardId: (boardId: string | null) => void;
   inspectionMode: VehicleInspectionMode;
   autoRotate: boolean;
+  showGrid?: boolean;
   theme: 'dark' | 'light';
   onRegisterFitCamera?: (fitFn: () => void) => void;
   onRegisterResetCamera?: (resetFn: () => void) => void;
+  onProjectedAnchor?: (anchor: { x: number; y: number; visible: boolean; boardId: string } | null) => void;
 }
 
 export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
@@ -34,9 +36,11 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
   setHoveredBoardId,
   inspectionMode,
   autoRotate,
+  showGrid = true,
   theme,
   onRegisterFitCamera,
   onRegisterResetCamera,
+  onProjectedAnchor,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
@@ -45,6 +49,8 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
   const vehicleRootRef = useRef<THREE.Group | null>(null);
   const inspectionModeRef = useRef<VehicleInspectionMode>(inspectionMode);
   inspectionModeRef.current = inspectionMode;
+  const onProjectedAnchorRef = useRef(onProjectedAnchor);
+  onProjectedAnchorRef.current = onProjectedAnchor;
 
   // Dynamic lights and environment ref for seamless theme transitions without re-mounting
   const lightsRef = useRef<{
@@ -152,6 +158,28 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
     };
   };
 
+  const createStudioBackgroundTexture = (isLight: boolean) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      const gradient = ctx.createRadialGradient(256, 256, 40, 256, 256, 340);
+      if (isLight) {
+        gradient.addColorStop(0, '#f8fafc');
+        gradient.addColorStop(0.5, '#f1f5f9');
+        gradient.addColorStop(1, '#e2e8f0');
+      } else {
+        gradient.addColorStop(0, '#101726'); // soft central halo behind vehicle
+        gradient.addColorStop(0.55, '#090d16');
+        gradient.addColorStop(1, '#05070a'); // deep vignette
+      }
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 512);
+    }
+    return new THREE.CanvasTexture(canvas);
+  };
+
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
@@ -164,8 +192,8 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
     sceneRef.current = scene;
 
     const isLight = theme === 'light';
-    scene.background = new THREE.Color(isLight ? 0xeef2f6 : 0x07090e);
-    scene.fog = new THREE.Fog(isLight ? 0xeef2f6 : 0x07090e, 18, 44);
+    scene.background = createStudioBackgroundTexture(isLight);
+    scene.fog = new THREE.Fog(isLight ? 0xeef2f6 : 0x05070a, 22, 50);
 
     // 2. Camera setup
     const camera = new THREE.PerspectiveCamera(38, width / height, 0.2, 100);
@@ -266,8 +294,9 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
     gridHelper.position.y = -5.46;
     const gridMat = gridHelper.material as THREE.LineBasicMaterial;
     gridMat.transparent = true;
-    gridMat.opacity = isLight ? 0.38 : 0.45;
+    gridMat.opacity = isLight ? 0.20 : 0.24;
     gridMat.depthWrite = false;
+    gridHelper.visible = showGrid !== false;
     scene.add(gridHelper);
 
     // Concentric telemetry range rings around the launch pad coordinate origin
@@ -278,7 +307,7 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
       const ringMat = new THREE.MeshBasicMaterial({
         color: isLight ? (idx === 0 ? 0x0284c7 : 0x64748b) : (idx === 0 ? 0x06b6d4 : 0x334155),
         transparent: true,
-        opacity: isLight ? 0.32 : 0.40,
+        opacity: isLight ? 0.18 : 0.22,
         side: THREE.DoubleSide,
         depthWrite: false,
       });
@@ -286,6 +315,7 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
       ringMesh.rotation.x = -Math.PI / 2;
       ringsGroup.add(ringMesh);
     });
+    ringsGroup.visible = showGrid !== false;
     scene.add(ringsGroup);
 
     lightsRef.current = {
@@ -1185,6 +1215,41 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
         });
       }
 
+      // Spatially Projected Technical Annotations Anchor Calculation
+      if (onProjectedAnchorRef.current) {
+        if (selectedBoardId && dynamicGroupsRef.current) {
+          const currentMode = inspectionModeRef.current;
+          const pos3D = new THREE.Vector3();
+          let found = false;
+
+          if (currentMode === 'exterior') {
+            const marker = dynamicGroupsRef.current.exteriorMarkerMeshes.find(m => m.boardId === selectedBoardId);
+            if (marker) {
+              marker.group.getWorldPosition(pos3D);
+              found = true;
+            }
+          } else {
+            const b = dynamicGroupsRef.current.boardMeshes.find(b => b.boardId === selectedBoardId);
+            if (b) {
+              b.mesh.getWorldPosition(pos3D);
+              found = true;
+            }
+          }
+
+          if (found) {
+            const projected = pos3D.clone().project(camera);
+            const isFront = projected.z < 1;
+            const x = ((projected.x + 1) / 2) * container.clientWidth;
+            const y = ((-projected.y + 1) / 2) * container.clientHeight;
+            onProjectedAnchorRef.current({ x, y, visible: isFront, boardId: selectedBoardId });
+          } else {
+            onProjectedAnchorRef.current(null);
+          }
+        } else {
+          onProjectedAnchorRef.current(null);
+        }
+      }
+
       renderer.render(scene, camera);
     };
 
@@ -1229,8 +1294,8 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
     const scene = sceneRef.current;
     const { keyLight, fillLight, rimLight, topLight, hemiLight, shadowPlane, gridHelper, ringsGroup } = lightsRef.current;
 
-    scene.background = new THREE.Color(isLight ? 0xeef2f6 : 0x07090e);
-    scene.fog = new THREE.Fog(isLight ? 0xeef2f6 : 0x07090e, 18, 44);
+    scene.background = createStudioBackgroundTexture(isLight);
+    scene.fog = new THREE.Fog(isLight ? 0xeef2f6 : 0x05070a, 22, 50);
 
     keyLight.intensity = isLight ? 3.0 : 3.6;
     fillLight.color.setHex(isLight ? 0xcfd8dc : 0xe2e8f0);
@@ -1248,7 +1313,7 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
 
     if (gridHelper) {
       const gMat = gridHelper.material as THREE.LineBasicMaterial;
-      gMat.opacity = isLight ? 0.38 : 0.45;
+      gMat.opacity = isLight ? 0.20 : 0.24;
     }
 
     if (ringsGroup) {
@@ -1256,10 +1321,18 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
         const rMesh = child as THREE.Mesh;
         const rMat = rMesh.material as THREE.MeshBasicMaterial;
         rMat.color.setHex(isLight ? (idx === 0 ? 0x0284c7 : 0x64748b) : (idx === 0 ? 0x06b6d4 : 0x334155));
-        rMat.opacity = isLight ? 0.32 : 0.40;
+        rMat.opacity = isLight ? 0.18 : 0.22;
       });
     }
   }, [theme]);
+
+  // Handle Ground Grid Visibility Toggle
+  useEffect(() => {
+    if (lightsRef.current) {
+      lightsRef.current.gridHelper.visible = showGrid !== false;
+      lightsRef.current.ringsGroup.visible = showGrid !== false;
+    }
+  }, [showGrid]);
 
   // Cinematic Camera Glide to Board or Return to Overview
   useEffect(() => {

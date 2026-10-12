@@ -21,6 +21,7 @@ import {
   Activity,
   ShieldAlert,
   RotateCcw,
+  Terminal as TerminalIcon,
 } from 'lucide-react';
 
 const MainWorkspace: React.FC = () => {
@@ -91,19 +92,32 @@ const MainWorkspace: React.FC = () => {
             </button>
           </div>
 
-          {/* Top-Right Floating Minimal Diagnostic Status Indicator */}
+          {/* Top-Right Floating Minimal Diagnostic Status Indicator & Terminal Link */}
           <div className="absolute top-5 right-5 z-20 pointer-events-auto flex items-center gap-2">
+            <button
+              onClick={() => setCurrentTab('terminal')}
+              title="Open Live ML Diagnostic Terminal"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-xl border shadow-xl cursor-pointer font-mono text-xs transition-all duration-200 hover:scale-102 ${
+                isDark
+                  ? 'bg-slate-950/75 border-slate-800 text-cyan-400 hover:border-cyan-700/60 shadow-black/40'
+                  : 'bg-white/85 border-slate-300 text-cyan-700 hover:border-cyan-600 shadow-slate-300/40'
+              }`}
+            >
+              <TerminalIcon className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">TERMINAL</span>
+            </button>
+
             <button
               onClick={() => setIsStatusOpen(!isStatusOpen)}
               title="Toggle Diagnostic Health Summary"
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-xl border shadow-xl cursor-pointer font-mono text-xs transition-all duration-200 hover:scale-102 ${
+              className={`flex items-center gap-2.5 px-3.5 py-1.5 rounded-full backdrop-blur-xl border shadow-xl cursor-pointer font-mono text-xs transition-all duration-200 hover:scale-102 ${
                 isDark
                   ? 'bg-slate-950/75 border-slate-800 text-slate-200 hover:border-slate-700 shadow-black/40'
                   : 'bg-white/85 border-slate-300 text-slate-800 hover:border-slate-400 shadow-slate-300/40'
               }`}
             >
               <span
-                className={`w-2 h-2 rounded-full ${
+                className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                   isTesting
                     ? 'bg-cyan-400 animate-ping'
                     : vehicle.status === 'fault'
@@ -113,15 +127,18 @@ const MainWorkspace: React.FC = () => {
                     : 'bg-emerald-400'
                 }`}
               />
-              <span className="text-[11px] font-semibold tracking-wide">
-                {isTesting
-                  ? `STIMULUS ${testProgress}%`
-                  : vehicle.status === 'fault'
-                  ? '1 FAULT DETECTED'
-                  : vehicle.status === 'warning'
-                  ? '1 ANOMALY'
-                  : 'SYSTEM NOMINAL'}
-              </span>
+              <div className="flex flex-col text-left leading-tight">
+                <span className="text-[9px] uppercase tracking-wider text-slate-400">
+                  SYSTEM HEALTH
+                </span>
+                <span className="text-[11px] font-bold mt-0.5">
+                  {isTesting
+                    ? `STIMULUS ${testProgress}%`
+                    : vehicle.activeFaultsCount > 0 || vehicle.suspectedAnomaliesCount > 0
+                    ? `${vehicle.activeFaultsCount} FAULT · ${vehicle.suspectedAnomaliesCount} ANOMALY`
+                    : 'ALL SYSTEMS NOMINAL'}
+                </span>
+              </div>
             </button>
           </div>
 

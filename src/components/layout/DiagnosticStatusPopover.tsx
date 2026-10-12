@@ -36,6 +36,7 @@ export const DiagnosticStatusPopover: React.FC<DiagnosticStatusPopoverProps> = (
     setCurrentTab,
     selectedBoardId,
     selectedComponentId,
+    testRuns,
   } = useSystem();
   const { isDark } = useTheme();
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -164,6 +165,12 @@ export const DiagnosticStatusPopover: React.FC<DiagnosticStatusPopoverProps> = (
           <span className="text-slate-400">STIMULUS PROTOCOL:</span>
           <span className={isTesting ? 'text-amber-400 font-semibold' : 'text-slate-400'}>
             {isTesting ? `RUNNING (${testProgress}%)` : 'STANDBY'}
+          </span>
+        </div>
+        <div className="flex items-center justify-between pt-1 border-t border-slate-700/40 text-[10px]">
+          <span className="text-slate-400">LAST COMPLETED TEST:</span>
+          <span className="text-slate-200 font-semibold">
+            {testRuns.length > 0 ? `${testRuns[0].id} · ${testRuns[0].outcome.toUpperCase()}` : 'RUN 0041 · FAULT'}
           </span>
         </div>
       </div>

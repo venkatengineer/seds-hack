@@ -3,7 +3,6 @@ import { BoardItem } from '../../types/vehicle';
 import { useSystem } from '../../context/SystemContext';
 import { useTheme } from '../../context/ThemeContext';
 import {
-  ExternalLink,
   ChevronRight,
   ArrowLeft,
   X,
@@ -15,11 +14,14 @@ import {
   Layers,
   Terminal,
   Compass,
+  Crosshair,
+  TrendingUp,
 } from 'lucide-react';
 
 interface CompactBayInspectorProps {
   board: BoardItem;
   onInspectBoard: (boardId: string) => void;
+  onFocusBoard?: () => void;
   onOpenTerminal?: () => void;
   onClose: () => void;
   inspectionMode?: 'exterior' | 'cutaway' | 'exploded';
@@ -29,6 +31,7 @@ interface CompactBayInspectorProps {
 export const CompactBayInspector: React.FC<CompactBayInspectorProps> = ({
   board,
   onInspectBoard,
+  onFocusBoard,
   onOpenTerminal,
   onClose,
   inspectionMode,
@@ -43,24 +46,30 @@ export const CompactBayInspector: React.FC<CompactBayInspectorProps> = ({
   const boardComponents = getBoardComponents(board.id);
   const faultyComp = boardComponents.find(c => c.status === 'fault');
 
+  const isFault = board.status === 'fault';
+  const isWarning = board.status === 'warning';
+
   return (
     <div
-      className={`absolute top-20 right-6 w-88 sm:w-96 rounded-xl p-4.5 backdrop-blur-2xl shadow-2xl z-30 pointer-events-auto transition-all animate-in fade-in slide-in-from-right-4 duration-300 border max-h-[calc(100vh-140px)] overflow-y-auto ${
+      className={`fixed sm:absolute bottom-0 sm:bottom-auto sm:top-20 right-0 sm:right-6 left-0 sm:left-auto w-full sm:w-84 md:w-88 rounded-t-2xl sm:rounded-xl p-4 backdrop-blur-2xl shadow-2xl z-40 pointer-events-auto transition-all animate-in fade-in slide-in-from-bottom-6 sm:slide-in-from-right-6 duration-250 border max-h-[75vh] sm:max-h-[calc(100vh-140px)] overflow-y-auto ${
         isDark
-          ? 'bg-[#0a0f18]/94 border-[#1e2a3c] text-slate-100 shadow-[0_16px_50px_rgba(0,0,0,0.7)]'
-          : 'bg-white/94 border-slate-200 text-slate-900 shadow-[0_16px_50px_rgba(0,0,0,0.14)]'
+          ? 'bg-[#0a0f18]/95 border-[#1e2a3c] text-slate-100 shadow-[0_16px_50px_rgba(0,0,0,0.7)]'
+          : 'bg-white/95 border-slate-200 text-slate-900 shadow-[0_16px_50px_rgba(0,0,0,0.14)]'
       }`}
     >
+      {/* Mobile Drawer Handle Pill */}
+      <div className="w-12 h-1 bg-slate-600/40 rounded-full mx-auto mb-2.5 sm:hidden" />
+
       {/* 6-Tier Hierarchy Breadcrumb Track */}
-      <div className={`pb-2.5 mb-3 border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+      <div className={`pb-2 mb-2.5 border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
         <div className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-slate-400 overflow-x-auto whitespace-nowrap pb-0.5">
           <span className="text-cyan-500 font-bold">ORION-IX</span>
           <ChevronRight className="w-2.5 h-2.5 opacity-50 shrink-0" />
-          <span className="truncate max-w-[80px]" title={subsystem?.name || board.subsystemId}>
+          <span className="truncate max-w-[85px]" title={subsystem?.name || board.subsystemId}>
             {subsystem ? subsystem.name.split(' ')[0] : board.subsystemId}
           </span>
           <ChevronRight className="w-2.5 h-2.5 opacity-50 shrink-0" />
-          <span className="truncate max-w-[80px]" title={assembly?.name || board.physicalAssemblyId}>
+          <span className="truncate max-w-[85px]" title={assembly?.name || board.physicalAssemblyId}>
             {assembly ? assembly.name.split(' ')[0] : board.physicalAssemblyId}
           </span>
           <ChevronRight className="w-2.5 h-2.5 opacity-50 shrink-0" />
@@ -83,11 +92,11 @@ export const CompactBayInspector: React.FC<CompactBayInspectorProps> = ({
           <div className="flex items-center gap-1.5 shrink-0">
             <span
               className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider ${
-                board.status === 'fault'
+                isFault
                   ? isDark
                     ? 'bg-rose-950/80 text-rose-300 border border-rose-700/60'
                     : 'bg-rose-100 text-rose-800 border border-rose-200'
-                  : board.status === 'warning'
+                  : isWarning
                   ? isDark
                     ? 'bg-amber-950/80 text-amber-300 border border-amber-700/60'
                     : 'bg-amber-100 text-amber-800 border border-amber-200'
@@ -111,7 +120,7 @@ export const CompactBayInspector: React.FC<CompactBayInspectorProps> = ({
 
       {/* Structural Airframe Mounting Data */}
       <div
-        className={`p-2 rounded-lg border font-mono text-[10px] mb-3 flex items-center justify-between ${
+        className={`p-2 rounded-lg border font-mono text-[10px] mb-2.5 flex items-center justify-between ${
           isDark ? 'bg-[#060a12]/70 border-slate-800/80 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
         }`}
       >
@@ -125,9 +134,48 @@ export const CompactBayInspector: React.FC<CompactBayInspectorProps> = ({
         </div>
       </div>
 
+      {/* Sensor Measurements & Expected Baseline Envelope */}
+      <div
+        className={`p-2.5 rounded-lg border font-mono text-[10px] mb-2.5 space-y-1.5 ${
+          isDark ? 'bg-[#060a12]/80 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'
+        }`}
+      >
+        <div className="flex items-center justify-between text-slate-400 pb-1 border-b border-slate-700/30">
+          <span className="font-semibold text-cyan-400 flex items-center gap-1">
+            <TrendingUp className="w-3 h-3" />
+            LATEST MEASUREMENT
+          </span>
+          <span>EXPECTED BASELINE</span>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Thermometer className="w-3 h-3 text-cyan-400" />
+            <span>TEMP: <strong className={isFault ? 'text-rose-400' : 'text-slate-100'}>{board.temperatureCelsius.toFixed(1)}°C</strong></span>
+          </div>
+          <span className="text-slate-400">38.0°C – 44.0°C</span>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Zap className="w-3 h-3 text-amber-400" />
+            <span>V_RAIL: <strong className={isWarning ? 'text-amber-400' : 'text-slate-100'}>{board.voltageRailV.toFixed(2)}V</strong></span>
+          </div>
+          <span className="text-slate-400">3.20V – 3.40V</span>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Cpu className="w-3 h-3 text-emerald-400" />
+            <span>CHANNELS: <strong>{board.monitoredSensorsCount} CH</strong></span>
+          </div>
+          <span className="text-slate-400">ADC 24-bit 100Hz</span>
+        </div>
+      </div>
+
       {/* Engineering Diagnostic Summary Snippet */}
       <div className="text-xs mb-3 leading-relaxed">
-        {board.status === 'fault' ? (
+        {isFault ? (
           <div
             className={`p-2.5 rounded-lg border flex items-start gap-2 font-mono text-[11px] ${
               isDark
@@ -143,7 +191,7 @@ export const CompactBayInspector: React.FC<CompactBayInspectorProps> = ({
               </div>
             </div>
           </div>
-        ) : board.status === 'warning' ? (
+        ) : isWarning ? (
           <div
             className={`p-2.5 rounded-lg border flex items-start gap-2 font-mono text-[11px] ${
               isDark
@@ -153,7 +201,7 @@ export const CompactBayInspector: React.FC<CompactBayInspectorProps> = ({
           >
             <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold">ANOMALY DETECTED:</span> Minor ripple elevation on auxiliary 3.3V rail.
+              <span className="font-bold">ANOMALY DETECTED:</span> Minor ripple elevation on auxiliary rail.
             </div>
           </div>
         ) : (
@@ -172,76 +220,22 @@ export const CompactBayInspector: React.FC<CompactBayInspectorProps> = ({
         )}
       </div>
 
-      {/* Primary Key Telemetry Measurements */}
-      <div
-        className={`grid grid-cols-3 gap-2 p-2.5 rounded-lg border font-mono text-[11px] mb-3 ${
-          isDark
-            ? 'bg-[#060a12]/80 border-slate-800 text-slate-200'
-            : 'bg-slate-50 border-slate-200 text-slate-800'
-        }`}
-      >
-        <div>
-          <div className="text-[10px] text-slate-400 flex items-center gap-1">
-            <Thermometer className="w-3 h-3 text-cyan-500" />
-            <span>TEMP</span>
-          </div>
-          <div className="font-bold mt-0.5">{board.temperatureCelsius.toFixed(1)}°C</div>
-        </div>
+      {/* Action Buttons: Inspect Board in 3D, Cutaway Toggle, Open PCB Explorer, Diagnostics */}
+      <div className="space-y-1.5 font-mono">
+        {onFocusBoard && (
+          <button
+            onClick={onFocusBoard}
+            className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all cursor-pointer"
+          >
+            <Crosshair className="w-3.5 h-3.5 text-cyan-400" />
+            <span>INSPECT BOARD (FRAME IN 3D)</span>
+          </button>
+        )}
 
-        <div>
-          <div className="text-[10px] text-slate-400 flex items-center gap-1">
-            <Zap className="w-3 h-3 text-amber-500" />
-            <span>V_RAIL</span>
-          </div>
-          <div className="font-bold mt-0.5">{board.voltageRailV.toFixed(2)}V</div>
-        </div>
-
-        <div>
-          <div className="text-[10px] text-slate-400 flex items-center gap-1">
-            <Cpu className="w-3 h-3 text-emerald-500" />
-            <span>CHANNELS</span>
-          </div>
-          <div className="font-bold mt-0.5">{board.monitoredSensorsCount} CH</div>
-        </div>
-      </div>
-
-      {/* Monitored SMT Components Micro-Pills */}
-      <div className="mb-3.5">
-        <div className="font-mono text-[10px] text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-          <span>MONITORED SMT ICS ({boardComponents.length})</span>
-          <span className="text-[9px] text-slate-500">LEVEL 5 / 6</span>
-        </div>
-        <div className="grid grid-cols-2 gap-1.5">
-          {boardComponents.slice(0, 4).map(comp => (
-            <div
-              key={comp.id}
-              className={`p-1.5 rounded border font-mono text-[10px] flex items-center justify-between ${
-                comp.status === 'fault'
-                  ? isDark
-                    ? 'bg-rose-950/50 border-rose-700/60 text-rose-300'
-                    : 'bg-rose-100 border-rose-300 text-rose-800'
-                  : comp.status === 'warning'
-                  ? isDark
-                    ? 'bg-amber-950/50 border-amber-700/60 text-amber-300'
-                    : 'bg-amber-100 border-amber-300 text-amber-800'
-                  : isDark
-                  ? 'bg-slate-900/60 border-slate-800/80 text-slate-400'
-                  : 'bg-white border-slate-200 text-slate-600'
-              }`}
-            >
-              <span className="font-semibold">{comp.referenceDesignator}</span>
-              <span className="text-[9px] uppercase">{comp.type.split('_')[0]}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Action Buttons: Inspect PCB, Cutaway Toggle, Live ML Terminal, and Return */}
-      <div className="space-y-1.5">
         {onToggleCutaway && (
           <button
             onClick={onToggleCutaway}
-            className={`w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg font-mono text-xs font-semibold border transition-all cursor-pointer ${
+            className={`w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
               inspectionMode === 'exterior'
                 ? isDark
                   ? 'bg-cyan-950/40 hover:bg-cyan-900/60 border-cyan-700/60 text-cyan-300'
@@ -260,7 +254,7 @@ export const CompactBayInspector: React.FC<CompactBayInspectorProps> = ({
 
         <button
           onClick={() => onInspectBoard(board.id)}
-          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg font-mono text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition-all cursor-pointer shadow-[0_0_16px_rgba(6,182,212,0.3)] hover:shadow-[0_0_20px_rgba(6,182,212,0.5)] group"
+          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition-all cursor-pointer shadow-[0_0_16px_rgba(6,182,212,0.3)] hover:shadow-[0_0_20px_rgba(6,182,212,0.5)] group"
         >
           <Cpu className="w-3.5 h-3.5" />
           <span>OPEN PCB EXPLORER</span>
@@ -275,30 +269,29 @@ export const CompactBayInspector: React.FC<CompactBayInspectorProps> = ({
               setCurrentTab('terminal');
             }
           }}
-          className={`w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg font-mono text-xs font-semibold border transition-all cursor-pointer ${
+          className={`w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
             isDark
               ? 'bg-slate-900/80 hover:bg-slate-800 border-cyan-800/40 text-cyan-300 hover:border-cyan-600'
               : 'bg-cyan-50 hover:bg-cyan-100 border-cyan-300 text-cyan-800'
           }`}
         >
           <Terminal className="w-3.5 h-3.5 text-cyan-400" />
-          <span>OPEN LIVE ML TERMINAL</span>
+          <span>OPEN DIAGNOSTICS (ML TERMINAL)</span>
           <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-70" />
         </button>
 
         <button
           onClick={onClose}
-          className={`w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg font-mono text-xs transition-colors cursor-pointer border ${
+          className={`w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs transition-colors cursor-pointer border ${
             isDark
               ? 'bg-slate-900/60 hover:bg-slate-800 border-slate-800 text-slate-400 hover:text-slate-200'
               : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600 hover:text-slate-900'
           }`}
         >
           <ArrowLeft className="w-3 h-3" />
-          <span>RETURN TO FULL VEHICLE</span>
+          <span>DISMISS & RETURN TO FULL VIEW</span>
         </button>
       </div>
     </div>
   );
 };
-

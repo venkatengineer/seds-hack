@@ -7,6 +7,9 @@ import { CompactBayInspector } from './CompactBayInspector';
 import { MinimalControlDock } from './MinimalControlDock';
 import { QuickBoardLocator } from './QuickBoardLocator';
 import { SpatialHoverTooltip } from './SpatialHoverTooltip';
+import { MissionContextPanel } from './MissionContextPanel';
+import { SensorTestActivityBar } from './SensorTestActivityBar';
+import { ProjectedVehicleAnnotation } from './ProjectedVehicleAnnotation';
 
 export const VehicleVisualization: React.FC = () => {
   const {
@@ -25,13 +28,23 @@ export const VehicleVisualization: React.FC = () => {
   const [activeTabMode, setActiveTabMode] = useState<'3d' | '2d'>('3d');
   const [inspectionMode, setInspectionMode] = useState<VehicleInspectionMode>('exterior');
   const [autoRotate, setAutoRotate] = useState<boolean>(false);
+  const [showGrid, setShowGrid] = useState<boolean>(true);
   const [hoveredBoardId, setHoveredBoardId] = useState<string | null>(null);
   const [fitCameraFn, setFitCameraFn] = useState<(() => void) | null>(null);
   const [resetCameraFn, setResetCameraFn] = useState<(() => void) | null>(null);
 
+  // Projected 3D-to-screen anchor position for selected board engineering callout
+  const [projectedAnchor, setProjectedAnchor] = useState<{
+    x: number;
+    y: number;
+    visible: boolean;
+    boardId: string;
+  } | null>(null);
+
   // Active board for HUD panel: only shown when a board is selected
   const selectedBoard = boards.find(b => b.id === selectedBoardId);
   const hoveredBoard = boards.find(b => b.id === hoveredBoardId);
+  const selectedSubsystem = subsystems.find(s => s.id === selectedBoard?.subsystemId);
 
   return (
     <div className="relative w-full h-full overflow-hidden select-none">
@@ -54,9 +67,11 @@ export const VehicleVisualization: React.FC = () => {
             setHoveredBoardId={setHoveredBoardId}
             inspectionMode={inspectionMode}
             autoRotate={autoRotate}
+            showGrid={showGrid}
             theme={theme}
             onRegisterFitCamera={fn => setFitCameraFn(() => fn)}
             onRegisterResetCamera={fn => setResetCameraFn(() => fn)}
+            onProjectedAnchor={setProjectedAnchor}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center p-4">
@@ -73,30 +88,55 @@ export const VehicleVisualization: React.FC = () => {
           </div>
         )}
 
-        {/* Quick Board Locator HUD Dropdown in Top-Left */}
-        <QuickBoardLocator
-          boards={boards}
-          selectedBoardId={selectedBoardId}
-          onSelectBoard={boardId => {
-            setSelectedBoardId(boardId || '');
-          }}
-          hoveredBoardId={hoveredBoardId}
-          setHoveredBoardId={setHoveredBoardId}
-          isDark={isDark}
-        />
+        {/* 1. Compact Mission Overview Panel in Upper-Left (under identity) */}
+        <MissionContextPanel />
 
-        {/* Spatial Hover Tooltip HUD Card (when hovering an exterior marker or internal LRU) */}
+        {/* 2. Quick Board Locator HUD Dropdown in Top-Left (beside mission panel) */}
+        <div className="hidden sm:block">
+          <QuickBoardLocator
+            boards={boards}
+            selectedBoardId={selectedBoardId}
+            onSelectBoard={boardId => {
+              setSelectedBoardId(boardId || '');
+            }}
+            hoveredBoardId={hoveredBoardId}
+            setHoveredBoardId={setHoveredBoardId}
+            isDark={isDark}
+          />
+        </div>
+
+        {/* 3. Real-Time Active Sensor Thermal Test Indicator */}
+        <SensorTestActivityBar />
+
+        {/* 4. Spatially Projected 3D Engineering Annotation Callout */}
+        {projectedAnchor && selectedBoard && (
+          <ProjectedVehicleAnnotation
+            anchor={projectedAnchor}
+            board={selectedBoard}
+            subsystem={selectedSubsystem}
+            isDark={isDark}
+          />
+        )}
+
+        {/* 5. Spatial Hover Tooltip HUD Card (when hovering an exterior marker or internal LRU) */}
         {hoveredBoard && !selectedBoard && (
           <SpatialHoverTooltip board={hoveredBoard} isDark={isDark} />
         )}
 
-        {/* Selected Board Progressive Disclosure Inspector Panel */}
+        {/* 6. Contextual Diagnostic Panel That Appears ONLY When a Board is Selected */}
         {selectedBoard && (
           <CompactBayInspector
             board={selectedBoard}
             onInspectBoard={selectBoardAndInspect}
+            onFocusBoard={() => {
+              // Trigger camera glide to focus on the selected board
+              setSelectedBoardId(selectedBoard.id);
+            }}
             onOpenTerminal={() => setCurrentTab('terminal')}
-            onClose={() => setSelectedBoardId('')}
+            onClose={() => {
+              setSelectedBoardId('');
+              setProjectedAnchor(null);
+            }}
             inspectionMode={inspectionMode}
             onToggleCutaway={() => {
               setInspectionMode(prev => (prev === 'exterior' ? 'cutaway' : 'exterior'));
@@ -104,7 +144,7 @@ export const VehicleVisualization: React.FC = () => {
           />
         )}
 
-        {/* Bottom Floating Minimal Control Dock */}
+        {/* 7. Bottom Floating Minimal Control Dock with Three Logical Groups */}
         <MinimalControlDock
           activeTabMode={activeTabMode}
           setActiveTabMode={setActiveTabMode}
@@ -112,6 +152,8 @@ export const VehicleVisualization: React.FC = () => {
           setInspectionMode={setInspectionMode}
           autoRotate={autoRotate}
           setAutoRotate={setAutoRotate}
+          showGrid={showGrid}
+          setShowGrid={setShowGrid}
           onFitVehicle={() => {
             if (fitCameraFn) fitCameraFn();
           }}
@@ -120,7 +162,7 @@ export const VehicleVisualization: React.FC = () => {
           }}
         />
 
-        {/* Subtle Spatial Interaction Hint in Bottom-Left */}
+        {/* 8. Subtle Spatial Interaction Hint in Bottom-Left */}
         <div
           className={`absolute bottom-6 left-6 hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full font-mono text-[10px] pointer-events-none backdrop-blur-md border ${
             isDark
