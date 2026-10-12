@@ -1,5 +1,6 @@
 import React from 'react';
 import { BoardItem } from '../../types/vehicle';
+import { VehicleInspectionMode } from './Vehicle3DCanvas';
 import { useSystem } from '../../context/SystemContext';
 import { useTheme } from '../../context/ThemeContext';
 import {
@@ -24,7 +25,7 @@ interface CompactBayInspectorProps {
   onFocusBoard?: () => void;
   onOpenTerminal?: () => void;
   onClose: () => void;
-  inspectionMode?: 'exterior' | 'cutaway' | 'exploded';
+  inspectionMode?: VehicleInspectionMode;
   onToggleCutaway?: () => void;
 }
 
@@ -247,7 +248,7 @@ export const CompactBayInspector: React.FC<CompactBayInspectorProps> = ({
           >
             <Layers className="w-3.5 h-3.5 text-cyan-400" />
             <span>
-              {inspectionMode === 'exterior' ? 'OPEN BAY CUTAWAY (LOOK INSIDE)' : 'RESTORE EXTERIOR HULL'}
+              {inspectionMode === 'exterior' ? 'OPEN CROSS-SECTION (LOOK INSIDE)' : 'RESTORE EXTERIOR HULL'}
             </span>
           </button>
         )}

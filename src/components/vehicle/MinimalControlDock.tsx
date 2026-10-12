@@ -94,24 +94,29 @@ export const MinimalControlDock: React.FC<MinimalControlDockProps> = ({
       )}
 
       {/* ============================================================== */}
-      {/* GROUP 2: INSPECTION (EXTERIOR / CUTAWAY / EXPLODED)           */}
+      {/* GROUP 2: INSPECTION (EXTERIOR / CROSS-SECTION / CUTAWAY / EXPLODED) */}
       {/* ============================================================== */}
       {activeTabMode === '3d' && (
         <div className="flex items-center gap-1 text-[11px]">
-          {(['exterior', 'cutaway', 'exploded'] as const).map(mode => (
+          {([
+            { id: 'exterior', label: 'Exterior' },
+            { id: 'cross-section', label: 'Cross-Section' },
+            { id: 'cutaway', label: 'Cutaway' },
+            { id: 'exploded', label: 'Exploded' },
+          ] as const).map(({ id, label }) => (
             <button
-              key={mode}
-              onClick={() => setInspectionMode(mode)}
-              title={`Inspection Mode: ${mode.charAt(0).toUpperCase() + mode.slice(1)}`}
-              className={`px-2.5 py-1 rounded-full capitalize transition-all cursor-pointer ${
-                inspectionMode === mode
+              key={id}
+              onClick={() => setInspectionMode(id)}
+              title={`Inspection Mode: ${label}`}
+              className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-all cursor-pointer ${
+                inspectionMode === id
                   ? isDark
                     ? 'bg-cyan-900/60 text-cyan-200 border border-cyan-600/70 font-semibold shadow-inner'
                     : 'bg-cyan-100 text-cyan-900 border border-cyan-300 font-semibold shadow-sm'
                   : 'text-slate-400 hover:text-slate-100'
               }`}
             >
-              {mode}
+              {label}
             </button>
           ))}
         </div>

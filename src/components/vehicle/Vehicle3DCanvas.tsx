@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { BoardItem, SubsystemItem, PhysicalAssemblyItem } from '../../types/vehicle';
 
-export type VehicleInspectionMode = 'exterior' | 'cutaway' | 'exploded';
+export type VehicleInspectionMode = 'exterior' | 'cross-section' | 'cutaway' | 'exploded';
 
 interface Vehicle3DCanvasProps {
   boards: BoardItem[];
@@ -21,6 +21,7 @@ interface Vehicle3DCanvasProps {
   theme: 'dark' | 'light';
   onRegisterFitCamera?: (fitFn: () => void) => void;
   onRegisterResetCamera?: (resetFn: () => void) => void;
+  onRegisterFocusBoard?: (focusFn: (boardId: string) => void) => void;
   onProjectedAnchor?: (anchor: { x: number; y: number; visible: boolean; boardId: string } | null) => void;
 }
 
@@ -40,6 +41,7 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
   theme,
   onRegisterFitCamera,
   onRegisterResetCamera,
+  onRegisterFocusBoard,
   onProjectedAnchor,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -51,6 +53,19 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
   inspectionModeRef.current = inspectionMode;
   const onProjectedAnchorRef = useRef(onProjectedAnchor);
   onProjectedAnchorRef.current = onProjectedAnchor;
+
+  // Track mode transitions for silky-smooth 400-800ms engineering cutaway / cross-section reveals
+  const modeTransitionRef = useRef<{
+    prevMode: VehicleInspectionMode;
+    currentMode: VehicleInspectionMode;
+    startTime: number;
+    duration: number;
+  }>({
+    prevMode: inspectionMode,
+    currentMode: inspectionMode,
+    startTime: performance.now(),
+    duration: 600,
+  });
 
   // Dynamic lights and environment ref for seamless theme transitions without re-mounting
   const lightsRef = useRef<{
@@ -90,6 +105,9 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
     cutawayRearFuselage: THREE.Mesh;
     interiorLining: THREE.Mesh;
     cutawayFuselageWindow: THREE.Mesh;
+    crossSectionRimGroup: THREE.Group;
+    frontSlidingShell: THREE.Mesh;
+    frontSlidingMaterial: THREE.MeshStandardMaterial;
     coreSpineGroup: THREE.Group;
     boosterGroup: THREE.Group;
     exteriorMarkersGroup: THREE.Group;
@@ -98,6 +116,7 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
     bayInternalLight2: THREE.PointLight;
     boardMeshes: {
       mesh: THREE.Mesh;
+      hitMesh: THREE.Mesh;
       boardId: string;
       subsystemId: string;
       baseY: number;
@@ -456,8 +475,8 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
     solidExteriorFuselage.receiveShadow = true;
     avionicsSectionGroup.add(solidExteriorFuselage);
 
-    // 2. Solid Rear Fuselage Shell (Covers rear 230 degrees in cutaway mode)
-    const cutawayRearGeo = new THREE.CylinderGeometry(0.85, 0.85, 2.5, 64, 1, false, Math.PI * 0.36, Math.PI * 1.28);
+    // 2. Solid Rear Fuselage Shell (Covers rear 180 degrees Z <= 0 in cross-section / cutaway)
+    const cutawayRearGeo = new THREE.CylinderGeometry(0.85, 0.85, 2.5, 64, 1, false, Math.PI * 0.5, Math.PI);
     const cutawayRearFuselage = new THREE.Mesh(cutawayRearGeo, hullWhiteMaterial);
     cutawayRearFuselage.position.y = 2.05;
     cutawayRearFuselage.castShadow = true;
@@ -465,18 +484,82 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
     avionicsSectionGroup.add(cutawayRearFuselage);
 
     // Gold Kapton thermal insulation MLI blanket lining on the interior rear wall
-    const interiorLiningGeo = new THREE.CylinderGeometry(0.835, 0.835, 2.46, 32, 1, true, Math.PI * 0.36, Math.PI * 1.28);
+    const interiorLiningGeo = new THREE.CylinderGeometry(0.835, 0.835, 2.48, 48, 1, true, Math.PI * 0.5, Math.PI);
     const interiorLining = new THREE.Mesh(interiorLiningGeo, goldKaptonMaterial);
     interiorLining.position.y = 2.05;
     avionicsSectionGroup.add(interiorLining);
 
     // 3. Cutaway Window Chamfered Frame (Active in 'cutaway' mode)
-    const cutawayGlassGeo = new THREE.CylinderGeometry(0.852, 0.852, 2.5, 48, 1, false, -Math.PI * 0.36, Math.PI * 0.72);
+    const cutawayGlassGeo = new THREE.CylinderGeometry(0.852, 0.852, 2.5, 48, 1, false, -Math.PI * 0.5, Math.PI);
     const cutawayFuselageWindow = new THREE.Mesh(cutawayGlassGeo, cutawayGlassMat);
     cutawayFuselageWindow.position.y = 2.05;
     avionicsSectionGroup.add(cutawayFuselageWindow);
 
-    // Structural bay ring bulkheads along avionics section with machined ports
+    // 4. Front Sliding Shell for Animated Pull-Apart / Longitudinal Section Transition
+    const frontSlidingGeo = new THREE.CylinderGeometry(0.85, 0.85, 2.5, 64, 1, false, -Math.PI * 0.5, Math.PI);
+    const frontSlidingMaterial = new THREE.MeshStandardMaterial({
+      color: isLight ? 0xf4f6fa : 0xf1f5f9,
+      metalness: 0.18,
+      roughness: 0.32,
+      transparent: true,
+      opacity: 1.0,
+    });
+    const frontSlidingShell = new THREE.Mesh(frontSlidingGeo, frontSlidingMaterial);
+    frontSlidingShell.position.set(0, 2.05, 0);
+    frontSlidingShell.castShadow = true;
+    frontSlidingShell.visible = false;
+    avionicsSectionGroup.add(frontSlidingShell);
+
+    // 5. Authentic Aerospace Longitudinal Cross-Section CAD Rim & Structural Cut Edges
+    const crossSectionRimGroup = new THREE.Group();
+    avionicsSectionGroup.add(crossSectionRimGroup);
+
+    // Machined Titanium Longitudinal Cut Flanges at X = -0.85 and +0.85, Z = 0
+    [-0.85, 0.85].forEach(x => {
+      const railGeo = new THREE.BoxGeometry(0.045, 2.5, 0.035);
+      const railMesh = new THREE.Mesh(railGeo, machinedAlloyMaterial);
+      railMesh.position.set(x, 2.05, 0);
+      crossSectionRimGroup.add(railMesh);
+    });
+
+    // Forward Pressure Bulkhead at Stage Joint (Y = 3.28)
+    const topBulkheadGeo = new THREE.CylinderGeometry(0.845, 0.845, 0.04, 48, 1, false, Math.PI * 0.5, Math.PI);
+    const topBulkheadMesh = new THREE.Mesh(topBulkheadGeo, bayChassisMaterial);
+    topBulkheadMesh.position.set(0, 3.28, 0);
+    crossSectionRimGroup.add(topBulkheadMesh);
+
+    const topCutBarGeo = new THREE.BoxGeometry(1.69, 0.04, 0.035);
+    const topCutBar = new THREE.Mesh(topCutBarGeo, machinedAlloyMaterial);
+    topCutBar.position.set(0, 3.28, 0);
+    crossSectionRimGroup.add(topCutBar);
+
+    // Aft Pressure Bulkhead at Interstage Joint (Y = 0.82)
+    const botBulkheadGeo = new THREE.CylinderGeometry(0.845, 0.845, 0.04, 48, 1, false, Math.PI * 0.5, Math.PI);
+    const botBulkheadMesh = new THREE.Mesh(botBulkheadGeo, bayChassisMaterial);
+    botBulkheadMesh.position.set(0, 0.82, 0);
+    crossSectionRimGroup.add(botBulkheadMesh);
+
+    const botCutBarGeo = new THREE.BoxGeometry(1.69, 0.04, 0.035);
+    const botCutBar = new THREE.Mesh(botCutBarGeo, machinedAlloyMaterial);
+    botCutBar.position.set(0, 0.82, 0);
+    crossSectionRimGroup.add(botCutBar);
+
+    // Circumferential Airframe Ring Frames and Cross-Ties at Y = 1.45, 2.05, 2.65
+    [1.45, 2.05, 2.65].forEach(y => {
+      const ribGeo = new THREE.TorusGeometry(0.845, 0.016, 16, 32, Math.PI);
+      const ribMesh = new THREE.Mesh(ribGeo, machinedAlloyMaterial);
+      ribMesh.rotation.x = Math.PI / 2;
+      ribMesh.rotation.z = Math.PI;
+      ribMesh.position.set(0, y, 0);
+      crossSectionRimGroup.add(ribMesh);
+
+      const barGeo = new THREE.BoxGeometry(1.68, 0.024, 0.024);
+      const barMesh = new THREE.Mesh(barGeo, bayChassisMaterial);
+      barMesh.position.set(0, y, 0);
+      crossSectionRimGroup.add(barMesh);
+    });
+
+    // Structural external bay joint rings
     [0.85, 1.45, 2.05, 2.65, 3.25].forEach(y => {
       const ringGeo = new THREE.TorusGeometry(0.858, 0.02, 16, 64);
       const ring = new THREE.Mesh(ringGeo, machinedAlloyMaterial);
@@ -505,6 +588,7 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
     // 6 Modular LRU Electronics Board Assemblies
     const boardMeshes: {
       mesh: THREE.Mesh;
+      hitMesh: THREE.Mesh;
       boardId: string;
       subsystemId: string;
       baseY: number;
@@ -607,8 +691,23 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
       boxHelper.visible = false;
       boardGroup.add(boxHelper);
 
+      // Dedicated Raycasting Hitbox for 100% Reliable Click & Hover Interaction
+      const boardHitGeo = new THREE.BoxGeometry(0.85, 0.24, 0.52);
+      const boardHitMat = new THREE.MeshBasicMaterial({ visible: false });
+      const boardHitMesh = new THREE.Mesh(boardHitGeo, boardHitMat);
+      boardHitMesh.position.set(0, 0, 0);
+      boardHitMesh.userData = {
+        boardId: board.id,
+        boardName: board.name,
+        subsystemId: board.subsystemId || slot.subsystemId,
+        baseY: slot.y,
+        isBoardHitbox: true,
+      };
+      boardGroup.add(boardHitMesh);
+
       boardMeshes.push({
         mesh: pcbMesh,
+        hitMesh: boardHitMesh,
         boardId: board.id,
         subsystemId: board.subsystemId || slot.subsystemId,
         baseY: slot.y,
@@ -890,6 +989,9 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
       cutawayRearFuselage,
       interiorLining,
       cutawayFuselageWindow,
+      crossSectionRimGroup,
+      frontSlidingShell,
+      frontSlidingMaterial,
       coreSpineGroup,
       boosterGroup,
       exteriorMarkersGroup,
@@ -938,6 +1040,28 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
       });
     }
 
+    if (onRegisterFocusBoard) {
+      onRegisterFocusBoard((boardId: string) => {
+        if (!cameraRef.current || !controlsRef.current || !dynamicGroupsRef.current) return;
+        const hitBoard = dynamicGroupsRef.current.boardMeshes.find(b => b.boardId === boardId);
+        if (!hitBoard) return;
+
+        // Dedicated close-up framing to inspect board mounting, connectors, and LEDs
+        const targetLookAt = new THREE.Vector3(0, hitBoard.baseY, 0.12);
+        const targetPos = new THREE.Vector3(0.95, hitBoard.baseY + 0.18, 2.15);
+
+        cameraAnimRef.current = {
+          isAnimating: true,
+          startTime: performance.now(),
+          duration: 750,
+          startPos: cameraRef.current.position.clone(),
+          targetPos,
+          startLookAt: controlsRef.current.target.clone(),
+          targetLookAt,
+        };
+      });
+    }
+
     // 9. Pointer Drag vs Click Isolation
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
@@ -970,6 +1094,7 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
       if (inspectionModeRef.current === 'exterior') {
         targetHitboxes.push(...exteriorMarkerMeshes.map(m => m.hitboxMesh));
       } else {
+        targetHitboxes.push(...boardMeshes.map(b => b.hitMesh));
         targetHitboxes.push(...boardMeshes.map(b => b.mesh));
         targetHitboxes.push(...exteriorMarkerMeshes.map(m => m.hitboxMesh));
       }
@@ -1006,6 +1131,7 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
       if (inspectionModeRef.current === 'exterior') {
         targetHitboxes.push(...exteriorMarkerMeshes.map(m => m.hitboxMesh));
       } else {
+        targetHitboxes.push(...boardMeshes.map(b => b.hitMesh));
         targetHitboxes.push(...boardMeshes.map(b => b.mesh));
         targetHitboxes.push(...exteriorMarkerMeshes.map(m => m.hitboxMesh));
       }
@@ -1060,7 +1186,7 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
       controls.autoRotateSpeed = 0.65;
       controls.update();
 
-      // Dynamic Assembly Offsets based on inspectionMode
+      // Dynamic Assembly Offsets based on inspectionMode with smooth transition
       if (dynamicGroupsRef.current) {
         const {
           noseGroup,
@@ -1069,6 +1195,9 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
           cutawayRearFuselage,
           interiorLining,
           cutawayFuselageWindow,
+          crossSectionRimGroup,
+          frontSlidingShell,
+          frontSlidingMaterial,
           coreSpineGroup,
           exteriorMarkersGroup,
           explodedGuidesGroup,
@@ -1079,6 +1208,11 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
         } = dynamicGroupsRef.current;
 
         const currentMode = inspectionModeRef.current;
+        const trans = modeTransitionRef.current;
+        const transElapsed = now - trans.startTime;
+        const transProgress = Math.min(1.0, transElapsed / trans.duration);
+        const transEase = easeInOutCubic(transProgress);
+
         let targetNoseY = 0;
         let targetBoosterY = 0;
 
@@ -1090,40 +1224,89 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
         noseGroup.position.y += (targetNoseY - noseGroup.position.y) * 0.08;
         boosterGroup.position.y += (targetBoosterY - boosterGroup.position.y) * 0.08;
 
-        // Visual panel states for exterior vs cutaway vs exploded
+        // Visual panel states with smooth 400-800ms transition between exterior, cross-section, cutaway, and exploded
         if (currentMode === 'exterior') {
-          // 100% Solid, seamless, continuous rocket!
-          solidExteriorFuselage.visible = true;
-          cutawayRearFuselage.visible = false;
-          interiorLining.visible = false;
-          cutawayFuselageWindow.visible = false;
-          coreSpineGroup.visible = false; // Hide internal electronics in exterior mode
-          exteriorMarkersGroup.visible = true; // Exterior interactive indicators visible!
-          explodedGuidesGroup.visible = false;
-          bayInternalLight1.intensity = 0;
-          bayInternalLight2.intensity = 0;
-        } else if (currentMode === 'cutaway') {
-          // Clean engineering cutaway revealing the internal LRU avionics bay
+          // If transitioning from cross-section / cutaway back to exterior:
+          if (trans.prevMode !== 'exterior' && transProgress < 1.0) {
+            solidExteriorFuselage.visible = false;
+            frontSlidingShell.visible = true;
+            frontSlidingShell.position.z = (1.0 - transEase) * 0.75;
+            frontSlidingMaterial.opacity = transEase;
+            cutawayRearFuselage.visible = true;
+            interiorLining.visible = true;
+            crossSectionRimGroup.visible = false;
+            cutawayFuselageWindow.visible = false;
+            coreSpineGroup.visible = true;
+            exteriorMarkersGroup.visible = transProgress > 0.5;
+            explodedGuidesGroup.visible = false;
+          } else {
+            // 100% Solid, seamless, continuous rocket!
+            solidExteriorFuselage.visible = true;
+            frontSlidingShell.visible = false;
+            cutawayRearFuselage.visible = false;
+            interiorLining.visible = false;
+            crossSectionRimGroup.visible = false;
+            cutawayFuselageWindow.visible = false;
+            coreSpineGroup.visible = false; // Hide internal electronics in exterior mode
+            exteriorMarkersGroup.visible = true; // Exterior interactive indicators visible!
+            explodedGuidesGroup.visible = false;
+          }
+          bayInternalLight1.intensity += (0 - bayInternalLight1.intensity) * 0.12;
+          bayInternalLight2.intensity += (0 - bayInternalLight2.intensity) * 0.12;
+        } else if (currentMode === 'cross-section') {
+          // Clean longitudinal engineering cross-section cut revealing internal avionics bays
           solidExteriorFuselage.visible = false;
           cutawayRearFuselage.visible = true;
           interiorLining.visible = true;
-          cutawayFuselageWindow.visible = true;
+          crossSectionRimGroup.visible = true;
+          cutawayFuselageWindow.visible = false; // No glass: unobstructed direct board inspection!
           coreSpineGroup.visible = true;
           exteriorMarkersGroup.visible = false;
           explodedGuidesGroup.visible = false;
-          bayInternalLight1.intensity = isLight ? 2.0 : 2.4;
-          bayInternalLight2.intensity = isLight ? 1.2 : 1.6;
+
+          // Animated sliding shell reveal if transitioning from exterior
+          if (trans.prevMode === 'exterior' && transProgress < 1.0) {
+            frontSlidingShell.visible = true;
+            frontSlidingShell.position.z = transEase * 0.75;
+            frontSlidingMaterial.opacity = 1.0 - transEase;
+          } else {
+            frontSlidingShell.visible = false;
+          }
+
+          const targetL1 = isLight ? 2.8 : 3.4;
+          const targetL2 = isLight ? 1.4 : 1.8;
+          bayInternalLight1.intensity += (targetL1 - bayInternalLight1.intensity) * 0.12;
+          bayInternalLight2.intensity += (targetL2 - bayInternalLight2.intensity) * 0.12;
+        } else if (currentMode === 'cutaway') {
+          // Engineering cutaway with translucent aerospace canopy
+          solidExteriorFuselage.visible = false;
+          cutawayRearFuselage.visible = true;
+          interiorLining.visible = true;
+          crossSectionRimGroup.visible = false;
+          cutawayFuselageWindow.visible = true;
+          frontSlidingShell.visible = false;
+          coreSpineGroup.visible = true;
+          exteriorMarkersGroup.visible = false;
+          explodedGuidesGroup.visible = false;
+          const targetL1 = isLight ? 2.0 : 2.4;
+          const targetL2 = isLight ? 1.2 : 1.6;
+          bayInternalLight1.intensity += (targetL1 - bayInternalLight1.intensity) * 0.12;
+          bayInternalLight2.intensity += (targetL2 - bayInternalLight2.intensity) * 0.12;
         } else {
           // Exploded mode: separated stages with visible internal equipment and alignment guides
           solidExteriorFuselage.visible = false;
           cutawayRearFuselage.visible = true;
           interiorLining.visible = true;
+          crossSectionRimGroup.visible = false;
           cutawayFuselageWindow.visible = false;
+          frontSlidingShell.visible = false;
           coreSpineGroup.visible = true;
           exteriorMarkersGroup.visible = false;
           explodedGuidesGroup.visible = true;
-          bayInternalLight1.intensity = isLight ? 1.5 : 1.8;
-          bayInternalLight2.intensity = isLight ? 1.0 : 1.2;
+          const targetL1 = isLight ? 1.5 : 1.8;
+          const targetL2 = isLight ? 1.0 : 1.2;
+          bayInternalLight1.intensity += (targetL1 - bayInternalLight1.intensity) * 0.12;
+          bayInternalLight2.intensity += (targetL2 - bayInternalLight2.intensity) * 0.12;
         }
 
         // Exterior Markers Animation, Pulsing, and Halos
@@ -1334,6 +1517,17 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
     }
   }, [showGrid]);
 
+  // Handle Inspection Mode Transitions with smooth 650ms animation duration
+  useEffect(() => {
+    if (modeTransitionRef.current.currentMode !== inspectionMode) {
+      modeTransitionRef.current.prevMode = modeTransitionRef.current.currentMode;
+      modeTransitionRef.current.currentMode = inspectionMode;
+      modeTransitionRef.current.startTime = performance.now();
+      modeTransitionRef.current.duration = 650;
+    }
+    inspectionModeRef.current = inspectionMode;
+  }, [inspectionMode]);
+
   // Cinematic Camera Glide to Board or Return to Overview
   useEffect(() => {
     if (!cameraRef.current || !controlsRef.current || !dynamicGroupsRef.current) return;
@@ -1364,6 +1558,9 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
         const y = marker ? marker.baseY : hitBoard.baseY;
         targetLookAt = new THREE.Vector3(0.2, y, 0.4);
         targetPos = new THREE.Vector3(1.6, y + 0.25, 3.2);
+      } else if (inspectionMode === 'cross-section') {
+        targetLookAt = new THREE.Vector3(0, hitBoard.baseY, 0.12);
+        targetPos = new THREE.Vector3(1.15, hitBoard.baseY + 0.25, 2.6);
       } else {
         targetLookAt = new THREE.Vector3(0, hitBoard.baseY, 0.15);
         targetPos = new THREE.Vector3(1.3, hitBoard.baseY + 0.3, 3.2);
@@ -1372,7 +1569,7 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
       cameraAnimRef.current = {
         isAnimating: true,
         startTime: performance.now(),
-        duration: 900,
+        duration: 850,
         startPos: cameraRef.current.position.clone(),
         targetPos,
         startLookAt: controlsRef.current.target.clone(),

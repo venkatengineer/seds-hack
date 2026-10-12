@@ -32,6 +32,7 @@ export const VehicleVisualization: React.FC = () => {
   const [hoveredBoardId, setHoveredBoardId] = useState<string | null>(null);
   const [fitCameraFn, setFitCameraFn] = useState<(() => void) | null>(null);
   const [resetCameraFn, setResetCameraFn] = useState<(() => void) | null>(null);
+  const [focusBoardFn, setFocusBoardFn] = useState<((boardId: string) => void) | null>(null);
 
   // Projected 3D-to-screen anchor position for selected board engineering callout
   const [projectedAnchor, setProjectedAnchor] = useState<{
@@ -71,6 +72,7 @@ export const VehicleVisualization: React.FC = () => {
             theme={theme}
             onRegisterFitCamera={fn => setFitCameraFn(() => fn)}
             onRegisterResetCamera={fn => setResetCameraFn(() => fn)}
+            onRegisterFocusBoard={fn => setFocusBoardFn(() => fn)}
             onProjectedAnchor={setProjectedAnchor}
           />
         ) : (
@@ -129,8 +131,14 @@ export const VehicleVisualization: React.FC = () => {
             board={selectedBoard}
             onInspectBoard={selectBoardAndInspect}
             onFocusBoard={() => {
-              // Trigger camera glide to focus on the selected board
-              setSelectedBoardId(selectedBoard.id);
+              // If in exterior mode, smoothly reveal the bay in cross-section
+              if (inspectionMode === 'exterior') {
+                setInspectionMode('cross-section');
+              }
+              // Animate camera to focus on that specific board
+              if (focusBoardFn && selectedBoard) {
+                focusBoardFn(selectedBoard.id);
+              }
             }}
             onOpenTerminal={() => setCurrentTab('terminal')}
             onClose={() => {
@@ -139,7 +147,7 @@ export const VehicleVisualization: React.FC = () => {
             }}
             inspectionMode={inspectionMode}
             onToggleCutaway={() => {
-              setInspectionMode(prev => (prev === 'exterior' ? 'cutaway' : 'exterior'));
+              setInspectionMode(prev => (prev === 'exterior' ? 'cross-section' : 'exterior'));
             }}
           />
         )}
