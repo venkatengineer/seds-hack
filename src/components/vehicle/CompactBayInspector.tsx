@@ -22,6 +22,8 @@ interface CompactBayInspectorProps {
   onInspectBoard: (boardId: string) => void;
   onOpenTerminal?: () => void;
   onClose: () => void;
+  inspectionMode?: 'exterior' | 'cutaway' | 'exploded';
+  onToggleCutaway?: () => void;
 }
 
 export const CompactBayInspector: React.FC<CompactBayInspectorProps> = ({
@@ -29,6 +31,8 @@ export const CompactBayInspector: React.FC<CompactBayInspectorProps> = ({
   onInspectBoard,
   onOpenTerminal,
   onClose,
+  inspectionMode,
+  onToggleCutaway,
 }) => {
   const { isDark } = useTheme();
   const { subsystems, physicalAssemblies, getBoardComponents, setCurrentTab } = useSystem();
@@ -232,8 +236,28 @@ export const CompactBayInspector: React.FC<CompactBayInspectorProps> = ({
         </div>
       </div>
 
-      {/* Action Buttons: Inspect PCB, Live ML Terminal, and Return */}
+      {/* Action Buttons: Inspect PCB, Cutaway Toggle, Live ML Terminal, and Return */}
       <div className="space-y-1.5">
+        {onToggleCutaway && (
+          <button
+            onClick={onToggleCutaway}
+            className={`w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg font-mono text-xs font-semibold border transition-all cursor-pointer ${
+              inspectionMode === 'exterior'
+                ? isDark
+                  ? 'bg-cyan-950/40 hover:bg-cyan-900/60 border-cyan-700/60 text-cyan-300'
+                  : 'bg-cyan-50 hover:bg-cyan-100 border-cyan-300 text-cyan-800'
+                : isDark
+                ? 'bg-slate-900/80 hover:bg-slate-800 border-slate-700 text-slate-300'
+                : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5 text-cyan-400" />
+            <span>
+              {inspectionMode === 'exterior' ? 'OPEN BAY CUTAWAY (LOOK INSIDE)' : 'RESTORE EXTERIOR HULL'}
+            </span>
+          </button>
+        )}
+
         <button
           onClick={() => onInspectBoard(board.id)}
           className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg font-mono text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition-all cursor-pointer shadow-[0_0_16px_rgba(6,182,212,0.3)] hover:shadow-[0_0_20px_rgba(6,182,212,0.5)] group"

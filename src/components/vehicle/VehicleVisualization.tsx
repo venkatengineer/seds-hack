@@ -5,6 +5,8 @@ import { Vehicle3DCanvas, VehicleInspectionMode } from './Vehicle3DCanvas';
 import { Vehicle2DBlueprint } from './Vehicle2DBlueprint';
 import { CompactBayInspector } from './CompactBayInspector';
 import { MinimalControlDock } from './MinimalControlDock';
+import { QuickBoardLocator } from './QuickBoardLocator';
+import { SpatialHoverTooltip } from './SpatialHoverTooltip';
 
 export const VehicleVisualization: React.FC = () => {
   const {
@@ -29,6 +31,7 @@ export const VehicleVisualization: React.FC = () => {
 
   // Active board for HUD panel: only shown when a board is selected
   const selectedBoard = boards.find(b => b.id === selectedBoardId);
+  const hoveredBoard = boards.find(b => b.id === hoveredBoardId);
 
   return (
     <div className="relative w-full h-full overflow-hidden select-none">
@@ -43,9 +46,6 @@ export const VehicleVisualization: React.FC = () => {
             selectedSubsystemId={selectedSubsystemId}
             onSelectBoard={boardId => {
               setSelectedBoardId(boardId || '');
-              if (boardId) {
-                setInspectionMode('cutaway');
-              }
             }}
             onSelectSubsystem={subsystemId => {
               setSelectedSubsystemId(subsystemId);
@@ -73,6 +73,23 @@ export const VehicleVisualization: React.FC = () => {
           </div>
         )}
 
+        {/* Quick Board Locator HUD Dropdown in Top-Left */}
+        <QuickBoardLocator
+          boards={boards}
+          selectedBoardId={selectedBoardId}
+          onSelectBoard={boardId => {
+            setSelectedBoardId(boardId || '');
+          }}
+          hoveredBoardId={hoveredBoardId}
+          setHoveredBoardId={setHoveredBoardId}
+          isDark={isDark}
+        />
+
+        {/* Spatial Hover Tooltip HUD Card (when hovering an exterior marker or internal LRU) */}
+        {hoveredBoard && !selectedBoard && (
+          <SpatialHoverTooltip board={hoveredBoard} isDark={isDark} />
+        )}
+
         {/* Selected Board Progressive Disclosure Inspector Panel */}
         {selectedBoard && (
           <CompactBayInspector
@@ -80,6 +97,10 @@ export const VehicleVisualization: React.FC = () => {
             onInspectBoard={selectBoardAndInspect}
             onOpenTerminal={() => setCurrentTab('terminal')}
             onClose={() => setSelectedBoardId('')}
+            inspectionMode={inspectionMode}
+            onToggleCutaway={() => {
+              setInspectionMode(prev => (prev === 'exterior' ? 'cutaway' : 'exterior'));
+            }}
           />
         )}
 

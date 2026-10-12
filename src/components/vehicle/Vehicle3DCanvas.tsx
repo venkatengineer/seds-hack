@@ -43,6 +43,8 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const vehicleRootRef = useRef<THREE.Group | null>(null);
+  const inspectionModeRef = useRef<VehicleInspectionMode>(inspectionMode);
+  inspectionModeRef.current = inspectionMode;
 
   // Dynamic lights and environment ref for seamless theme transitions without re-mounting
   const lightsRef = useRef<{
@@ -84,6 +86,10 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
     cutawayFuselageWindow: THREE.Mesh;
     coreSpineGroup: THREE.Group;
     boosterGroup: THREE.Group;
+    exteriorMarkersGroup: THREE.Group;
+    explodedGuidesGroup: THREE.Group;
+    bayInternalLight1: THREE.PointLight;
+    bayInternalLight2: THREE.PointLight;
     boardMeshes: {
       mesh: THREE.Mesh;
       boardId: string;
@@ -91,6 +97,17 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
       baseY: number;
       selectionBox: THREE.BoxHelper;
       ledLight: THREE.PointLight;
+    }[];
+    exteriorMarkerMeshes: {
+      group: THREE.Group;
+      hitboxMesh: THREE.Mesh;
+      gemMesh: THREE.Mesh;
+      haloMesh: THREE.Mesh;
+      ledLight: THREE.PointLight;
+      boardId: string;
+      subsystemId: string;
+      baseY: number;
+      status: string;
     }[];
   } | null>(null);
 
@@ -571,6 +588,187 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
     });
 
     // =========================================================================
+    // C2. EXTERIOR AIRFRAME AVIONICS SERVICE MARKERS & EXPLODED GUIDES
+    // =========================================================================
+    const exteriorMarkersGroup = new THREE.Group();
+    avionicsSectionGroup.add(exteriorMarkersGroup);
+
+    const explodedGuidesGroup = new THREE.Group();
+    vehicleRoot.add(explodedGuidesGroup);
+
+    // Longitudinal Avionics Service Meridian Seam Guide on Fuselage Skin
+    const serviceSeamGeo = new THREE.BoxGeometry(0.012, 2.38, 0.008);
+    const serviceSeamMesh = new THREE.Mesh(serviceSeamGeo, machinedAlloyMaterial);
+    serviceSeamMesh.position.set(Math.sin(0.48 - 0.02) * 0.862, 2.05, Math.cos(0.48 - 0.02) * 0.862);
+    serviceSeamMesh.rotation.y = 0.48;
+    exteriorMarkersGroup.add(serviceSeamMesh);
+
+    const exteriorMarkerMeshes: {
+      group: THREE.Group;
+      hitboxMesh: THREE.Mesh;
+      gemMesh: THREE.Mesh;
+      haloMesh: THREE.Mesh;
+      ledLight: THREE.PointLight;
+      boardId: string;
+      subsystemId: string;
+      baseY: number;
+      status: string;
+    }[] = [];
+
+    boards.forEach((board, index) => {
+      const slot = boardSlotLayout.find(s => s.id === board.id) || boardSlotLayout[index] || { id: board.id, y: 2.0, z: 0, subsystemId: 'SUB-01' };
+
+      const markerSubGroup = new THREE.Group();
+      const mX = Math.sin(0.48) * 0.864;
+      const mZ = Math.cos(0.48) * 0.864;
+      markerSubGroup.position.set(mX, slot.y, mZ);
+      markerSubGroup.rotation.y = Math.atan2(mX, mZ);
+
+      // Machined titanium bezel ring
+      const bezelGeo = new THREE.TorusGeometry(0.065, 0.012, 16, 32);
+      const bezelMesh = new THREE.Mesh(bezelGeo, machinedAlloyMaterial);
+      markerSubGroup.add(bezelMesh);
+
+      // Backing disc
+      const backingGeo = new THREE.CylinderGeometry(0.065, 0.065, 0.008, 32);
+      const backingMesh = new THREE.Mesh(backingGeo, darkGraphiteMaterial);
+      backingMesh.rotation.x = Math.PI / 2;
+      backingMesh.position.z = -0.002;
+      markerSubGroup.add(backingMesh);
+
+      // Status Optical Indicator Gem Lens
+      const gemColor = board.status === 'fault' ? 0xef4444 : board.status === 'warning' ? 0xf59e0b : 0x10b981;
+      const gemGeo = new THREE.CylinderGeometry(0.040, 0.042, 0.014, 24);
+      const gemMat = new THREE.MeshStandardMaterial({
+        color: gemColor,
+        emissive: gemColor,
+        emissiveIntensity: board.status === 'fault' ? 0.85 : 0.4,
+        roughness: 0.25,
+        metalness: 0.1,
+      });
+      const gemMesh = new THREE.Mesh(gemGeo, gemMat);
+      gemMesh.rotation.x = Math.PI / 2;
+      gemMesh.position.z = 0.005;
+      markerSubGroup.add(gemMesh);
+
+      // Status Halo Ring
+      const haloGeo = new THREE.RingGeometry(0.076, 0.098, 32);
+      const haloMat = new THREE.MeshBasicMaterial({
+        color: gemColor,
+        transparent: true,
+        opacity: board.status === 'fault' ? 0.75 : 0.35,
+        side: THREE.DoubleSide,
+      });
+      const haloMesh = new THREE.Mesh(haloGeo, haloMat);
+      haloMesh.position.z = 0.008;
+      markerSubGroup.add(haloMesh);
+
+      // Subtle Stencil Tag Canvas Texture
+      const tagCanvas = document.createElement('canvas');
+      tagCanvas.width = 160;
+      tagCanvas.height = 48;
+      const tagCtx = tagCanvas.getContext('2d');
+      if (tagCtx) {
+        tagCtx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        tagCtx.strokeStyle = board.status === 'fault' ? 'rgba(239, 68, 68, 0.85)' : 'rgba(100, 116, 139, 0.6)';
+        tagCtx.lineWidth = 2;
+        if (typeof tagCtx.roundRect === 'function') {
+          tagCtx.roundRect(4, 4, 152, 40, 6);
+        } else {
+          tagCtx.rect(4, 4, 152, 40);
+        }
+        tagCtx.fill();
+        tagCtx.stroke();
+        tagCtx.fillStyle = board.status === 'fault' ? '#fca5a5' : '#e2e8f0';
+        tagCtx.font = 'bold 18px monospace';
+        tagCtx.textAlign = 'center';
+        tagCtx.textBaseline = 'middle';
+        tagCtx.fillText(`${board.id}`, 80, 24);
+      }
+      const tagTex = new THREE.CanvasTexture(tagCanvas);
+      const tagGeo = new THREE.PlaneGeometry(0.16, 0.048);
+      const tagMat = new THREE.MeshBasicMaterial({ map: tagTex, transparent: true });
+      const tagMesh = new THREE.Mesh(tagGeo, tagMat);
+      tagMesh.position.set(0.14, 0, 0.006);
+      markerSubGroup.add(tagMesh);
+
+      // Low-range localized point light for realistic hull glow
+      const markerLight = new THREE.PointLight(gemColor, board.status === 'fault' ? 0.9 : 0.3, 0.55);
+      markerLight.position.set(0, 0, 0.06);
+      markerSubGroup.add(markerLight);
+
+      // Invisible Raycasting Hitbox
+      const hitboxGeo = new THREE.BoxGeometry(0.34, 0.18, 0.15);
+      const hitboxMat = new THREE.MeshBasicMaterial({ visible: false });
+      const hitboxMesh = new THREE.Mesh(hitboxGeo, hitboxMat);
+      hitboxMesh.position.set(0.07, 0, 0.02);
+      hitboxMesh.userData = {
+        boardId: board.id,
+        boardName: board.name,
+        subsystemId: board.subsystemId || slot.subsystemId,
+        baseY: slot.y,
+        isExteriorMarker: true,
+      };
+      markerSubGroup.add(hitboxMesh);
+
+      exteriorMarkersGroup.add(markerSubGroup);
+
+      exteriorMarkerMeshes.push({
+        group: markerSubGroup,
+        hitboxMesh,
+        gemMesh,
+        haloMesh,
+        ledLight: markerLight,
+        boardId: board.id,
+        subsystemId: board.subsystemId || slot.subsystemId,
+        baseY: slot.y,
+        status: board.status,
+      });
+    });
+
+    // Exploded mode structural alignment guides and board callout lines
+    [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].forEach(angle => {
+      const points = [
+        new THREE.Vector3(Math.cos(angle) * 0.855, -2.0, Math.sin(angle) * 0.855),
+        new THREE.Vector3(Math.cos(angle) * 0.855, 3.8, Math.sin(angle) * 0.855),
+      ];
+      const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+      const lineMat = new THREE.LineDashedMaterial({
+        color: 0x06b6d4,
+        dashSize: 0.15,
+        gapSize: 0.1,
+        transparent: true,
+        opacity: 0.45,
+      });
+      const line = new THREE.Line(lineGeo, lineMat);
+      line.computeLineDistances();
+      explodedGuidesGroup.add(line);
+    });
+
+    boardSlotLayout.forEach(slot => {
+      const points = [
+        new THREE.Vector3(0.38, slot.y, 0.14),
+        new THREE.Vector3(1.15, slot.y, 0.25),
+      ];
+      const calloutGeo = new THREE.BufferGeometry().setFromPoints(points);
+      const calloutMat = new THREE.LineBasicMaterial({
+        color: slot.id === 'BRD-03' ? 0xef4444 : 0x06b6d4,
+        transparent: true,
+        opacity: 0.55,
+      });
+      const calloutLine = new THREE.Line(calloutGeo, calloutMat);
+      explodedGuidesGroup.add(calloutLine);
+
+      const sphereGeo = new THREE.SphereGeometry(0.03, 12, 12);
+      const sphereMat = new THREE.MeshBasicMaterial({
+        color: slot.id === 'BRD-03' ? 0xef4444 : 0x06b6d4,
+      });
+      const dot = new THREE.Mesh(sphereGeo, sphereMat);
+      dot.position.set(1.15, slot.y, 0.25);
+      explodedGuidesGroup.add(dot);
+    });
+
+    // =========================================================================
     // D. INTERSTAGE & MAIN BOOSTER PROPELLANT STAGE (Y = -3.4 to +0.8)
     // =========================================================================
     // Smooth Interstage Coupler Barrel with titanium separation band
@@ -664,7 +862,12 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
       cutawayFuselageWindow,
       coreSpineGroup,
       boosterGroup,
+      exteriorMarkersGroup,
+      explodedGuidesGroup,
+      bayInternalLight1,
+      bayInternalLight2,
       boardMeshes,
+      exteriorMarkerMeshes,
     };
 
     // Calculate initial framed camera state based on actual model bounds
@@ -732,7 +935,16 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
       raycaster.setFromCamera(mouse, camera);
-      const boardHits = raycaster.intersectObjects(boardMeshes.map(b => b.mesh));
+
+      const targetHitboxes: THREE.Object3D[] = [];
+      if (inspectionModeRef.current === 'exterior') {
+        targetHitboxes.push(...exteriorMarkerMeshes.map(m => m.hitboxMesh));
+      } else {
+        targetHitboxes.push(...boardMeshes.map(b => b.mesh));
+        targetHitboxes.push(...exteriorMarkerMeshes.map(m => m.hitboxMesh));
+      }
+
+      const boardHits = raycaster.intersectObjects(targetHitboxes);
 
       if (boardHits.length > 0) {
         const hoveredId = boardHits[0].object.userData.boardId;
@@ -759,10 +971,19 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
       raycaster.setFromCamera(mouse, camera);
-      const boardHits = raycaster.intersectObjects(boardMeshes.map(b => b.mesh));
+
+      const targetHitboxes: THREE.Object3D[] = [];
+      if (inspectionModeRef.current === 'exterior') {
+        targetHitboxes.push(...exteriorMarkerMeshes.map(m => m.hitboxMesh));
+      } else {
+        targetHitboxes.push(...boardMeshes.map(b => b.mesh));
+        targetHitboxes.push(...exteriorMarkerMeshes.map(m => m.hitboxMesh));
+      }
+
+      const boardHits = raycaster.intersectObjects(targetHitboxes);
 
       if (boardHits.length > 0) {
-        // Specific avionics board clicked! Select it in 3D.
+        // Specific avionics board / exterior marker clicked! Select it in 3D.
         const hitBoardId = boardHits[0].object.userData.boardId;
         const hitSubsystemId = boardHits[0].object.userData.subsystemId;
         onSelectBoard(hitBoardId);
@@ -819,13 +1040,19 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
           interiorLining,
           cutawayFuselageWindow,
           coreSpineGroup,
+          exteriorMarkersGroup,
+          explodedGuidesGroup,
+          bayInternalLight1,
+          bayInternalLight2,
           boardMeshes,
+          exteriorMarkerMeshes,
         } = dynamicGroupsRef.current;
 
+        const currentMode = inspectionModeRef.current;
         let targetNoseY = 0;
         let targetBoosterY = 0;
 
-        if (inspectionMode === 'exploded') {
+        if (currentMode === 'exploded') {
           targetNoseY = 1.8;
           targetBoosterY = -1.8;
         }
@@ -834,32 +1061,85 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
         boosterGroup.position.y += (targetBoosterY - boosterGroup.position.y) * 0.08;
 
         // Visual panel states for exterior vs cutaway vs exploded
-        if (inspectionMode === 'exterior') {
+        if (currentMode === 'exterior') {
           // 100% Solid, seamless, continuous rocket!
           solidExteriorFuselage.visible = true;
           cutawayRearFuselage.visible = false;
           interiorLining.visible = false;
           cutawayFuselageWindow.visible = false;
-          coreSpineGroup.visible = false; // Hide all internal electronics in exterior mode!
-        } else if (inspectionMode === 'cutaway') {
+          coreSpineGroup.visible = false; // Hide internal electronics in exterior mode
+          exteriorMarkersGroup.visible = true; // Exterior interactive indicators visible!
+          explodedGuidesGroup.visible = false;
+          bayInternalLight1.intensity = 0;
+          bayInternalLight2.intensity = 0;
+        } else if (currentMode === 'cutaway') {
           // Clean engineering cutaway revealing the internal LRU avionics bay
           solidExteriorFuselage.visible = false;
           cutawayRearFuselage.visible = true;
           interiorLining.visible = true;
           cutawayFuselageWindow.visible = true;
           coreSpineGroup.visible = true;
+          exteriorMarkersGroup.visible = false;
+          explodedGuidesGroup.visible = false;
+          bayInternalLight1.intensity = isLight ? 2.0 : 2.4;
+          bayInternalLight2.intensity = isLight ? 1.2 : 1.6;
         } else {
-          // Exploded mode: separated stages with visible internal equipment
+          // Exploded mode: separated stages with visible internal equipment and alignment guides
           solidExteriorFuselage.visible = false;
           cutawayRearFuselage.visible = true;
           interiorLining.visible = true;
           cutawayFuselageWindow.visible = false;
           coreSpineGroup.visible = true;
+          exteriorMarkersGroup.visible = false;
+          explodedGuidesGroup.visible = true;
+          bayInternalLight1.intensity = isLight ? 1.5 : 1.8;
+          bayInternalLight2.intensity = isLight ? 1.0 : 1.2;
         }
 
-        // Board Highlighting, Pulsing, and LED behavior
+        // Exterior Markers Animation, Pulsing, and Halos
+        if (currentMode === 'exterior') {
+          exteriorMarkerMeshes.forEach(marker => {
+            const isSelected = marker.boardId === selectedBoardId;
+            const isHovered = marker.boardId === hoveredBoardId;
+            const isFault = marker.status === 'fault';
+            const isWarning = marker.status === 'warning';
+
+            if (isFault) {
+              const pulse = Math.sin(elapsedTime * 5.5) * 0.5 + 0.5;
+              const gemMat = marker.gemMesh.material as THREE.MeshStandardMaterial;
+              gemMat.emissiveIntensity = 0.5 + pulse * 0.8;
+              marker.ledLight.intensity = 0.5 + pulse * 1.0;
+
+              const haloMat = marker.haloMesh.material as THREE.MeshBasicMaterial;
+              haloMat.opacity = 0.35 + pulse * 0.55;
+              const haloScale = 1.0 + pulse * 0.24;
+              marker.haloMesh.scale.set(haloScale, haloScale, 1);
+            } else if (isSelected) {
+              const pulse = Math.sin(elapsedTime * 4.0) * 0.5 + 0.5;
+              const haloMat = marker.haloMesh.material as THREE.MeshBasicMaterial;
+              haloMat.opacity = 0.6 + pulse * 0.35;
+              marker.haloMesh.scale.set(1.22, 1.22, 1);
+            } else if (isHovered) {
+              const haloMat = marker.haloMesh.material as THREE.MeshBasicMaterial;
+              haloMat.opacity = 0.85;
+              marker.haloMesh.scale.set(1.15, 1.15, 1);
+            } else {
+              const haloMat = marker.haloMesh.material as THREE.MeshBasicMaterial;
+              haloMat.opacity = isWarning ? 0.45 : 0.25;
+              marker.haloMesh.scale.set(1.0, 1.0, 1);
+            }
+
+            if (isHovered || isSelected) {
+              marker.group.scale.set(1.08, 1.08, 1.08);
+            } else {
+              marker.group.scale.set(1.0, 1.0, 1.0);
+            }
+          });
+        }
+
+        // Internal Board Highlighting, Pulsing, and LED behavior
         boardMeshes.forEach(({ mesh, boardId, selectionBox, ledLight }) => {
-          if (inspectionMode === 'exterior' && !selectedBoardId) {
+          if (currentMode === 'exterior') {
             mesh.visible = false;
             selectionBox.visible = false;
             ledLight.visible = false;
@@ -1003,8 +1283,18 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
 
     const hitBoard = dynamicGroupsRef.current.boardMeshes.find(b => b.boardId === selectedBoardId);
     if (hitBoard) {
-      const targetLookAt = new THREE.Vector3(0, hitBoard.baseY, 0.15);
-      const targetPos = new THREE.Vector3(1.3, hitBoard.baseY + 0.3, 3.2);
+      let targetLookAt: THREE.Vector3;
+      let targetPos: THREE.Vector3;
+
+      if (inspectionMode === 'exterior') {
+        const marker = dynamicGroupsRef.current.exteriorMarkerMeshes.find(m => m.boardId === selectedBoardId);
+        const y = marker ? marker.baseY : hitBoard.baseY;
+        targetLookAt = new THREE.Vector3(0.2, y, 0.4);
+        targetPos = new THREE.Vector3(1.6, y + 0.25, 3.2);
+      } else {
+        targetLookAt = new THREE.Vector3(0, hitBoard.baseY, 0.15);
+        targetPos = new THREE.Vector3(1.3, hitBoard.baseY + 0.3, 3.2);
+      }
 
       cameraAnimRef.current = {
         isAnimating: true,
@@ -1016,24 +1306,7 @@ export const Vehicle3DCanvas: React.FC<Vehicle3DCanvasProps> = ({
         targetLookAt,
       };
     }
-  }, [selectedBoardId]);
-
-  // Recalculate framing when switching inspection mode (exterior, cutaway, exploded)
-  useEffect(() => {
-    if (selectedBoardId) return;
-    if (!vehicleRootRef.current || !cameraRef.current || !controlsRef.current) return;
-
-    const fitted = computeFittedCameraState(cameraRef.current, vehicleRootRef.current, inspectionMode);
-    cameraAnimRef.current = {
-      isAnimating: true,
-      startTime: performance.now(),
-      duration: 750,
-      startPos: cameraRef.current.position.clone(),
-      targetPos: fitted.position,
-      startLookAt: controlsRef.current.target.clone(),
-      targetLookAt: fitted.target,
-    };
-  }, [inspectionMode]);
+  }, [selectedBoardId, inspectionMode]);
 
   return <div ref={mountRef} className="w-full h-full relative cursor-grab active:cursor-grabbing select-none" />;
 };
