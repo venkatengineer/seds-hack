@@ -4,7 +4,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { Radio, Cpu, ChevronDown, ChevronUp } from 'lucide-react';
 
 export const MissionContextPanel: React.FC = () => {
-  const { vehicle, isTesting, testRuns } = useSystem();
+  const { vehicle, isTesting, testRuns, esp32Connected, esp32Telemetry, setCurrentTab } = useSystem();
   const { isDark } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -95,11 +95,32 @@ export const MissionContextPanel: React.FC = () => {
         {/* Hardware Connection */}
         <div className="flex items-center justify-between">
           <span className="text-slate-400 text-[10px]">HARDWARE LINK:</span>
-          <span className="text-emerald-400 font-medium flex items-center gap-1 text-[10px]">
-            <Radio className="w-3 h-3 text-emerald-400" />
-            SIMULATED (CAN 10ms)
-          </span>
+          {esp32Connected ? (
+            <button
+              onClick={() => setCurrentTab('terminal')}
+              title="Open ESP32 Hardware Terminal"
+              className="text-emerald-400 font-bold flex items-center gap-1 text-[10px] hover:text-emerald-300 transition-colors cursor-pointer"
+            >
+              <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
+              LIVE ESP32 (/dev/ttyACM0)
+            </button>
+          ) : (
+            <span className="text-emerald-400 font-medium flex items-center gap-1 text-[10px]">
+              <Radio className="w-3 h-3 text-emerald-400" />
+              SIMULATED (CAN 10ms)
+            </span>
+          )}
         </div>
+
+        {/* Live ESP32 Sensor Summary if connected */}
+        {esp32Connected && esp32Telemetry && (
+          <div className="flex items-center justify-between pt-1 border-t border-slate-800/40 text-[10px]">
+            <span className="text-slate-400">TELEMETRY (BRD-03):</span>
+            <span className="text-emerald-300 font-semibold font-mono">
+              {esp32Telemetry.ds18b20Temp !== null ? `${esp32Telemetry.ds18b20Temp.toFixed(1)}°C` : '--'} · {esp32Telemetry.busVoltage !== null ? `${esp32Telemetry.busVoltage.toFixed(2)}V` : '--'}
+            </span>
+          </div>
+        )}
 
         {/* ML Inference Status */}
         <div className="flex items-center justify-between">

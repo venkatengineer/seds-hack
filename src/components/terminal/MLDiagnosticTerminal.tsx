@@ -20,7 +20,9 @@ import {
   Maximize2,
   Pause,
   Download,
+  Radio,
 } from 'lucide-react';
+import { Esp32SerialTerminal } from './Esp32SerialTerminal';
 
 export const MLDiagnosticTerminal: React.FC = () => {
   const {
@@ -43,9 +45,12 @@ export const MLDiagnosticTerminal: React.FC = () => {
     setSelectedComponentId,
     setCurrentTab,
     vehicle,
+    esp32Connected,
+    esp32Telemetry,
   } = useSystem();
   const { isDark } = useTheme();
 
+  const [terminalMode, setTerminalMode] = useState<'esp32' | 'ml'>('esp32');
   const [severityFilter, setSeverityFilter] = useState<'ALL' | 'FAULT' | 'WARNING' | 'TEST' | 'MODEL'>('ALL');
   const [boardFilter, setBoardFilter] = useState<string>('ALL');
   const [autoScroll, setAutoScroll] = useState<boolean>(true);
@@ -81,12 +86,78 @@ export const MLDiagnosticTerminal: React.FC = () => {
 
   return (
     <div className="w-full h-full flex flex-col gap-3 font-mono text-xs select-none">
-      {/* Top Engineering Terminal Header */}
-      <div
-        className={`p-3 rounded-xl border flex flex-wrap items-center justify-between gap-3 shadow-sm ${
-          isDark ? 'bg-[#0a0e16] border-[#1b2536]' : 'bg-white border-slate-200'
-        }`}
-      >
+      {/* View Switcher: ESP32 Hardware Stream vs ML Neural Logs */}
+      <div className="flex items-center justify-between gap-3 shrink-0">
+        <div
+          className={`flex items-center p-1 rounded-xl border ${
+            isDark ? 'bg-[#090d16] border-[#182335]' : 'bg-slate-100 border-slate-200'
+          }`}
+        >
+          <button
+            onClick={() => setTerminalMode('esp32')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-mono text-xs font-bold transition-all cursor-pointer ${
+              terminalMode === 'esp32'
+                ? 'bg-emerald-600 text-white shadow-[0_0_12px_rgba(16,185,129,0.4)]'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                esp32Connected
+                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse'
+                  : 'bg-rose-500'
+              }`}
+            />
+            <span>ASTRA-IST ESP32 SERIAL</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-black/30 border border-white/20">
+              {esp32Connected ? '/dev/ttyACM0' : 'OFFLINE'}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setTerminalMode('ml')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-mono text-xs font-bold transition-all cursor-pointer ${
+              terminalMode === 'ml'
+                ? 'bg-cyan-600 text-white shadow-[0_0_12px_rgba(6,182,212,0.4)]'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-cyan-400" />
+            <span>ML NEURAL DIAGNOSTIC LOGS</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-black/30 border border-white/20">
+              SIMULATED
+            </span>
+          </button>
+        </div>
+
+        {/* Live ESP32 Sensor Quick Badges */}
+        {esp32Telemetry && (
+          <div className="hidden md:flex items-center gap-2 text-[11px] font-mono">
+            <span className="px-2.5 py-1 rounded-lg border bg-emerald-950/40 border-emerald-800/40 text-emerald-300">
+              DS18B20: {esp32Telemetry.ds18b20Temp !== null ? `${esp32Telemetry.ds18b20Temp.toFixed(2)}°C` : '--'}
+            </span>
+            <span className="px-2.5 py-1 rounded-lg border bg-teal-950/40 border-teal-800/40 text-teal-300">
+              NTC: {esp32Telemetry.ntcTemp !== null ? `${esp32Telemetry.ntcTemp.toFixed(1)}°C` : '--'}
+            </span>
+            <span className="px-2.5 py-1 rounded-lg border bg-amber-950/40 border-amber-800/40 text-amber-300">
+              RAIL: {esp32Telemetry.busVoltage !== null ? `${esp32Telemetry.busVoltage.toFixed(3)}V` : '--'}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {terminalMode === 'esp32' ? (
+        <div className="flex-1 overflow-hidden min-h-[580px]">
+          <Esp32SerialTerminal />
+        </div>
+      ) : (
+        <>
+          {/* Top Engineering Terminal Header */}
+          <div
+            className={`p-3 rounded-xl border flex flex-wrap items-center justify-between gap-3 shadow-sm ${
+              isDark ? 'bg-[#0a0e16] border-[#1b2536]' : 'bg-white border-slate-200'
+            }`}
+          >
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-sm bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
@@ -465,6 +536,8 @@ export const MLDiagnosticTerminal: React.FC = () => {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };

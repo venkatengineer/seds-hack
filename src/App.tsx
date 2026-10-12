@@ -10,6 +10,7 @@ import { BoardDiagnostics } from './pages/BoardDiagnostics';
 import { LiveTelemetry } from './pages/LiveTelemetry';
 import { FaultAnalysis } from './pages/FaultAnalysis';
 import { MLDiagnosticTerminal } from './components/terminal/MLDiagnosticTerminal';
+import { Esp32ModalDrawer } from './components/terminal/Esp32ModalDrawer';
 import { TestHistory } from './pages/TestHistory';
 import { Settings } from './pages/Settings';
 import {
@@ -25,12 +26,13 @@ import {
 } from 'lucide-react';
 
 const MainWorkspace: React.FC = () => {
-  const { currentTab, setCurrentTab, vehicle, isTesting, testProgress } = useSystem();
+  const { currentTab, setCurrentTab, vehicle, isTesting, testProgress, esp32Connected, esp32Telemetry } = useSystem();
   const { theme, toggleTheme, isDark } = useTheme();
 
   const [isNavOpen, setIsNavOpen] = useState<boolean>(false);
   const [isStatusOpen, setIsStatusOpen] = useState<boolean>(false);
   const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
+  const [isEsp32Open, setIsEsp32Open] = useState<boolean>(false);
 
   const getTabTitle = () => {
     switch (currentTab) {
@@ -94,6 +96,35 @@ const MainWorkspace: React.FC = () => {
 
           {/* Top-Right Floating Minimal Diagnostic Status Indicator & Terminal Link */}
           <div className="absolute top-5 right-5 z-20 pointer-events-auto flex items-center gap-2">
+            {/* Live ESP32 Hardware Status Button */}
+            <button
+              onClick={() => setIsEsp32Open(true)}
+              title="Open Live ESP32 Hardware Serial Terminal"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-xl border shadow-xl cursor-pointer font-mono text-xs transition-all duration-200 hover:scale-102 ${
+                esp32Connected
+                  ? isDark
+                    ? 'bg-emerald-950/75 border-emerald-700/60 text-emerald-300 hover:border-emerald-500 shadow-emerald-950/30'
+                    : 'bg-emerald-50/90 border-emerald-300 text-emerald-800 hover:border-emerald-500 shadow-emerald-200/30'
+                  : isDark
+                  ? 'bg-slate-950/75 border-slate-800 text-slate-400 hover:border-slate-700 shadow-black/40'
+                  : 'bg-white/85 border-slate-300 text-slate-600 hover:border-slate-400 shadow-slate-300/40'
+              }`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  esp32Connected
+                    ? 'bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.9)]'
+                    : 'bg-slate-500'
+                }`}
+              />
+              <span className="font-bold">ESP32</span>
+              {esp32Connected && esp32Telemetry?.ds18b20Temp !== null && (
+                <span className="hidden sm:inline text-[11px] font-mono text-emerald-400">
+                  {esp32Telemetry?.ds18b20Temp?.toFixed(1)}°C
+                </span>
+              )}
+            </button>
+
             <button
               onClick={() => setCurrentTab('terminal')}
               title="Open Live ML Diagnostic Terminal"
@@ -199,6 +230,32 @@ const MainWorkspace: React.FC = () => {
             {/* Right: Quick Diagnostic Status Pill, Theme Toggle & Report */}
             <div className="flex items-center gap-2">
               <button
+                onClick={() => setIsEsp32Open(true)}
+                title="Open Live ESP32 Hardware Terminal Window"
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border font-mono text-xs transition-colors cursor-pointer ${
+                  esp32Connected
+                    ? isDark
+                      ? 'bg-emerald-950/70 border-emerald-800/60 text-emerald-300'
+                      : 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                    : isDark
+                    ? 'bg-slate-900 border-slate-800 text-slate-400'
+                    : 'bg-slate-100 border-slate-200 text-slate-600'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    esp32Connected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                  }`}
+                />
+                <span className="font-bold">ESP32</span>
+                {esp32Connected && esp32Telemetry?.ds18b20Temp !== null && (
+                  <span className="hidden sm:inline text-[10px] text-emerald-400">
+                    {esp32Telemetry?.ds18b20Temp?.toFixed(1)}°C
+                  </span>
+                )}
+              </button>
+
+              <button
                 onClick={() => setIsStatusOpen(!isStatusOpen)}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-full border font-mono text-xs transition-colors cursor-pointer ${
                   isDark
@@ -280,6 +337,12 @@ const MainWorkspace: React.FC = () => {
       <ReportModal
         isOpen={isReportOpen}
         onClose={() => setIsReportOpen(false)}
+      />
+
+      {/* Live ESP32 Hardware Serial Terminal Modal */}
+      <Esp32ModalDrawer
+        isOpen={isEsp32Open}
+        onClose={() => setIsEsp32Open(false)}
       />
     </div>
   );

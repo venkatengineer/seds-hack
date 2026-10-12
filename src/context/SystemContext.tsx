@@ -20,6 +20,7 @@ import { INITIAL_COMPONENTS } from '../data/mockComponents';
 import { INITIAL_TEST_RUNS, INITIAL_SYSTEM_EVENTS, INITIAL_DIAGNOSTIC_RESULT_TEMP02 } from '../data/mockHistory';
 import { generateThermalPulseData, SignalBehaviorMode } from '../data/mockTelemetry';
 import { mlDiagnosticAdapter } from '../services/mlDiagnosticAdapter';
+import { esp32Service, Esp32Telemetry } from '../services/esp32Service';
 
 export type NavigationTab = 
   | 'overview'
@@ -156,6 +157,10 @@ interface SystemContextValue {
   injectComponentFault: (compId: string, status: HealthStatus, anomaly?: string) => void;
   resetDemoState: () => void;
   simulationNotice: string;
+
+  // Live Hardware ESP32 Integration
+  esp32Connected: boolean;
+  esp32Telemetry: Esp32Telemetry | null;
 }
 
 const SystemContext = createContext<SystemContextValue | undefined>(undefined);
@@ -191,6 +196,57 @@ export const SystemProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [testRuns, setTestRuns] = useState<TestRunRecord[]>(INITIAL_TEST_RUNS);
   const [systemEvents, setSystemEvents] = useState<SystemEvent[]>(INITIAL_SYSTEM_EVENTS);
   const [terminalEvents, setTerminalEvents] = useState<TerminalEvent[]>(INITIAL_TERMINAL_EVENTS);
+
+  // Live Hardware ESP32 Integration
+  const [esp32Connected, setEsp32Connected] = useState<boolean>(() => esp32Service.getStatus().connected);
+  const [esp32Telemetry, setEsp32Telemetry] = useState<Esp32Telemetry | null>(() => esp32Service.getTelemetry());
+
+  useEffect(() => {
+    const unsubStatus = esp32Service.subscribeStatus(s => {
+      setEsp32Connected(s.connected);
+    });
+
+    const unsubTelemetry = esp32Service.subscribeTelemetry(t => {
+      setEsp32Telemetry(t);
+      if (t.ds18b20Temp !== null || t.busVoltage !== null) {
+        setBoards(prevBoards =>
+          prevBoards.map(b => {
+            if (b.id === 'BRD-03') {
+              return {
+                ...b,
+                temperatureCelsius: t.ds18b20Temp ?? b.temperatureCelsius,
+                voltageRailV: t.busVoltage ?? b.voltageRailV,
+              };
+            }
+            return b;
+          })
+        );
+
+        setComponents(prevComps =>
+          prevComps.map(c => {
+            if (c.id === 'CMP-03-04' && t.ds18b20Temp !== null) {
+              return {
+                ...c,
+                latestMeasuredResponse: t.ds18b20Temp,
+              };
+            }
+            if (c.id === 'CMP-03-03' && t.ntcTemp !== null) {
+              return {
+                ...c,
+                latestMeasuredResponse: t.ntcTemp,
+              };
+            }
+            return c;
+          })
+        );
+      }
+    });
+
+    return () => {
+      unsubStatus();
+      unsubTelemetry();
+    };
+  }, []);
 
   // Active Entity Resolution
   const selectedSubsystem = useMemo(() => {
@@ -593,6 +649,8 @@ export const SystemProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         injectComponentFault,
         resetDemoState,
         simulationNotice: 'Simulated Flight Hardware & Edge ML Model (Virtual CAN Bus Link @ 10ms cycle latency)',
+        esp32Connected,
+        esp32Telemetry,
       }}
     >
       {children}
