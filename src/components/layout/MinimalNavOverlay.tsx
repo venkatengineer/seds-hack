@@ -15,6 +15,7 @@ import {
   RotateCcw,
   ShieldAlert,
   ChevronRight,
+  Wind,
 } from 'lucide-react';
 
 interface MinimalNavOverlayProps {
@@ -49,6 +50,13 @@ export const MinimalNavOverlay: React.FC<MinimalNavOverlayProps> = ({
       label: 'Vehicle 3D Stage',
       icon: Rocket,
       description: 'Primary vehicle inspection stage with cutaway & exploded models',
+    },
+    {
+      id: 'balloon',
+      label: 'Balloon Landing & BLDC Recovery',
+      icon: Wind,
+      description: 'Variable-buoyancy ballonet pumping & vectoring BLDC motor wind compensation',
+      badge: 'SIMULATION',
     },
     {
       id: 'pcb',

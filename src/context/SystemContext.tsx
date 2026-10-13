@@ -30,7 +30,8 @@ export type NavigationTab =
   | 'faults'
   | 'terminal'
   | 'history'
-  | 'settings';
+  | 'settings'
+  | 'balloon';
 
 const INITIAL_TERMINAL_EVENTS: TerminalEvent[] = [
   {

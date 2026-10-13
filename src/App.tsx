@@ -13,6 +13,7 @@ import { MLDiagnosticTerminal } from './components/terminal/MLDiagnosticTerminal
 import { Esp32ModalDrawer } from './components/terminal/Esp32ModalDrawer';
 import { TestHistory } from './pages/TestHistory';
 import { Settings } from './pages/Settings';
+import { BalloonLandingPage } from './pages/BalloonLandingPage';
 import {
   Menu,
   ArrowLeft,
@@ -23,6 +24,7 @@ import {
   ShieldAlert,
   RotateCcw,
   Terminal as TerminalIcon,
+  Wind,
 } from 'lucide-react';
 
 const MainWorkspace: React.FC = () => {
@@ -46,6 +48,8 @@ const MainWorkspace: React.FC = () => {
         return 'MACHINE LEARNING FAULT DIAGNOSTICS';
       case 'terminal':
         return 'LIVE ML DIAGNOSTIC TERMINAL';
+      case 'balloon':
+        return 'BALLOON RECOVERY & BLDC LANDING SIMULATION';
       case 'topology':
         return 'VEHICLE AVIONICS TOPOLOGY';
       case 'history':
@@ -96,6 +100,21 @@ const MainWorkspace: React.FC = () => {
 
           {/* Top-Right Floating Minimal Diagnostic Status Indicator & Terminal Link */}
           <div className="absolute top-5 right-5 z-20 pointer-events-auto flex items-center gap-2">
+            {/* Quick Launch Balloon Landing Simulation Button */}
+            <button
+              onClick={() => setCurrentTab('balloon')}
+              title="Launch Balloon Variable-Buoyancy Landing & BLDC Wind Compensation Simulation"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-xl border shadow-xl cursor-pointer font-mono text-xs transition-all duration-200 hover:scale-105 ${
+                isDark
+                  ? 'bg-sky-950/80 border-sky-500/50 text-sky-300 hover:border-sky-400 shadow-sky-950/40'
+                  : 'bg-sky-50 border-sky-300 text-sky-800 hover:border-sky-500 shadow-sky-200/40'
+              }`}
+            >
+              <Wind className="w-3.5 h-3.5 text-sky-400" />
+              <span className="font-bold">BALLOON LANDING</span>
+              <span className="px-1.5 py-0.2 rounded bg-sky-500/20 text-[10px] text-sky-300 font-semibold border border-sky-500/40">SIM</span>
+            </button>
+
             {/* Live ESP32 Hardware Status Button */}
             <button
               onClick={() => setIsEsp32Open(true)}
@@ -305,7 +324,12 @@ const MainWorkspace: React.FC = () => {
           </header>
 
           {/* Main Engineering Tool Workspace Content Area */}
-          <main className="flex-1 overflow-y-auto p-4 sm:p-5 relative">
+          <main
+            className={`flex-1 relative ${
+              currentTab === 'balloon' ? 'overflow-hidden p-0' : 'overflow-y-auto p-4 sm:p-5'
+            }`}
+          >
+            {currentTab === 'balloon' && <BalloonLandingPage />}
             {currentTab === 'topology' && <VehicleTopology />}
             {currentTab === 'pcb' && <BoardDiagnostics />}
             {currentTab === 'telemetry' && <LiveTelemetry />}
